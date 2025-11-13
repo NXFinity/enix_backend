@@ -1,4 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateUserDto, UpdateUserDto } from './assets/dto/createUser.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from './assets/entities/user.entity';
@@ -22,7 +29,7 @@ export class UsersService {
   // #########################################################
 
   // User Creation
-  async create(createUserDto: {
+  async create(user: {
     username: string;
     email: string;
     password: string;
@@ -30,11 +37,11 @@ export class UsersService {
     verificationToken: string;
     role?: ROLE.Member;
   }): Promise<User> {
-    const findByEmail = await this.findByEmail(createUserDto.email);
+    const findByEmail = await this.findByEmail(user.email);
     if (findByEmail) {
       throw new HttpException('User already exists', HttpStatus.BAD_REQUEST);
     }
-    const newUser = await this.usersRepository.save(user);
+    const newUser = await this.userRepository.save(user);
     // Create Users Profile
     const profile = new Profile();
     profile.user = newUser;
@@ -50,7 +57,7 @@ export class UsersService {
   // Find All Users
   async findAll() {
     try {
-      return this.usersRepository
+      return this.userRepository
         .createQueryBuilder('user')
         .leftJoinAndSelect('user.profile', 'profile')
         .select()
@@ -64,7 +71,7 @@ export class UsersService {
   // Find by ID
   async findOne(id: string): Promise<User> {
     try {
-      const user = await this.usersRepository
+      const user = await this.userRepository
         .createQueryBuilder('user')
         .leftJoinAndSelect('user.profile', 'profile')
         .where('user.id = :id', { id })
@@ -85,7 +92,7 @@ export class UsersService {
   // Find by Username
   async findByUsername(username: string): Promise<User> {
     try {
-      const user = await this.usersRepository
+      const user = await this.userRepository
         .createQueryBuilder('user')
         .leftJoinAndSelect('user.profile', 'profile')
         .where('user.username = :username', { username })
@@ -110,7 +117,7 @@ export class UsersService {
   // Find by Email Address
   async findByEmail(email: string): Promise<User> {
     try {
-      const user = await this.usersRepository
+      const user = await this.userRepository
         .createQueryBuilder('user')
         .leftJoinAndSelect('user.profile', 'profile')
         .where('user.email = :email', { email })
@@ -140,7 +147,7 @@ export class UsersService {
 
   async deleteUser(id: string, currentUser: User): Promise<void> {
     // Step 1: Find the user to delete
-    const user = await this.usersRepository.findOne({
+    const user = await this.userRepository.findOne({
       where: { id },
     });
 
@@ -156,6 +163,6 @@ export class UsersService {
     }
 
     // Step 3: Hard delete (permanent)
-    await this.usersRepository.remove(user);
+    await this.userRepository.remove(user);
   }
 }

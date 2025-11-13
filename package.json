@@ -154,7 +154,9 @@
     ],
     "moduleNameMapper": {
       "^@database/database(|/.*)$": "<rootDir>/libs/database/src/$1",
-      "^@email/email(|/.*)$": "<rootDir>/libs/email/src/$1"
+      "^@email/email(|/.*)$": "<rootDir>/libs/email/src/$1",
+      "^@kafka/kafka(|/.*)$": "<rootDir>/libs/kafka/src/$1",
+      "^@redis/redis(|/.*)$": "<rootDir>/libs/redis/src/$1"
     }
   }
 }

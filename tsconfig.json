@@ -29,6 +29,18 @@
       ],
       "@email/email/*": [
         "libs/email/src/*"
+      ],
+      "@kafka/kafka": [
+        "libs/kafka/src"
+      ],
+      "@kafka/kafka/*": [
+        "libs/kafka/src/*"
+      ],
+      "@redis/redis": [
+        "libs/redis/src"
+      ],
+      "@redis/redis/*": [
+        "libs/redis/src/*"
       ]
     }
   }
