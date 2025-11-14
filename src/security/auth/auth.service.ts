@@ -17,6 +17,8 @@ import { ChangeDto } from './dto/change.dto';
 import { ForgotDto } from './dto/forgot.dto';
 import { ResetDto } from './dto/reset.dto';
 import { EmailService } from '@email/email';
+import { LoggingService } from '@logging/logging';
+import { LogCategory } from '@logging/logging';
 
 // Enum
 import { ROLE } from '../roles/assets/enum/role.enum';
@@ -27,6 +29,7 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly emailService: EmailService,
+    private readonly loggingService: LoggingService,
   ) {}
 
   // #########################################################
@@ -94,7 +97,16 @@ export class AuthService {
       );
     } catch (error) {
       // Log error but don't fail registration if email fails
-      console.error('Failed to send verification email:', error);
+      this.loggingService.error(
+        'Failed to send verification email',
+        error instanceof Error ? error.stack : undefined,
+        'AuthService',
+        {
+          category: LogCategory.EMAIL,
+          error: error instanceof Error ? error : new Error(String(error)),
+          metadata: { email, username },
+        },
+      );
     }
 
     // Return user without password
@@ -192,7 +204,16 @@ export class AuthService {
         newVerificationToken,
       );
     } catch (error) {
-      console.error('Failed to send verification email:', error);
+      this.loggingService.error(
+        'Failed to send verification email',
+        error instanceof Error ? error.stack : undefined,
+        'AuthService',
+        {
+          category: LogCategory.EMAIL,
+          error: error instanceof Error ? error : new Error(String(error)),
+          metadata: { email, username: user.username },
+        },
+      );
       throw new HttpException(
         'Failed to send verification email. Please try again later.',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -267,7 +288,16 @@ export class AuthService {
     await new Promise<void>((resolve, reject) => {
       request.session.save((err: any) => {
         if (err) {
-          console.error('Session save error:', err);
+          this.loggingService.error(
+            'Session save error',
+            err instanceof Error ? err.stack : undefined,
+            'AuthService',
+            {
+              category: LogCategory.AUTHENTICATION,
+              error: err instanceof Error ? err : new Error(String(err)),
+              metadata: { userId: user.id, email: user.email },
+            },
+          );
           reject(
             new HttpException(
               'Failed to save session',
@@ -290,7 +320,15 @@ export class AuthService {
     return new Promise<void>((resolve, reject) => {
       request.session.destroy((err: any) => {
         if (err) {
-          console.error('Session destroy error:', err);
+          this.loggingService.error(
+            'Session destroy error',
+            err instanceof Error ? err.stack : undefined,
+            'AuthService',
+            {
+              category: LogCategory.AUTHENTICATION,
+              error: err instanceof Error ? err : new Error(String(err)),
+            },
+          );
           reject(
             new HttpException(
               'Failed to logout',
@@ -357,7 +395,16 @@ export class AuthService {
         user.username,
       );
     } catch (error) {
-      console.error('Failed to send password changed email:', error);
+      this.loggingService.error(
+        'Failed to send password changed email',
+        error instanceof Error ? error.stack : undefined,
+        'AuthService',
+        {
+          category: LogCategory.EMAIL,
+          error: error instanceof Error ? error : new Error(String(error)),
+          metadata: { userId, email: user.email },
+        },
+      );
       // Don't fail the operation if email fails
     }
 
@@ -408,7 +455,16 @@ export class AuthService {
         resetToken,
       );
     } catch (error) {
-      console.error('Failed to send forgot password email:', error);
+      this.loggingService.error(
+        'Failed to send forgot password email',
+        error instanceof Error ? error.stack : undefined,
+        'AuthService',
+        {
+          category: LogCategory.EMAIL,
+          error: error instanceof Error ? error : new Error(String(error)),
+          metadata: { email },
+        },
+      );
       // Don't reveal if email failed
     }
 
@@ -464,7 +520,16 @@ export class AuthService {
         token,
       );
     } catch (error) {
-      console.error('Failed to send password reset confirmation email:', error);
+      this.loggingService.error(
+        'Failed to send password reset confirmation email',
+        error instanceof Error ? error.stack : undefined,
+        'AuthService',
+        {
+          category: LogCategory.EMAIL,
+          error: error instanceof Error ? error : new Error(String(error)),
+          metadata: { email: security.user.email },
+        },
+      );
       // Don't fail the operation if email fails
     }
 

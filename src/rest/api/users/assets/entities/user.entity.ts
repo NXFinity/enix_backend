@@ -1,4 +1,4 @@
-import { Column, Entity, OneToOne } from 'typeorm';
+import { Column, Entity, Index, OneToOne } from 'typeorm';
 import { BaseEntity } from '@database/database';
 import { ROLE } from 'src/security/roles/assets/enum/role.enum';
 import { Profile } from './profile.entity';
@@ -6,6 +6,12 @@ import { Privacy } from './security/privacy.entity';
 import { Security } from './security/security.entity';
 
 @Entity('user', { schema: 'account' })
+@Index(['websocketId'])
+@Index(['username'])
+@Index(['email'])
+@Index(['displayName'])
+@Index(['role'])
+@Index(['isPublic'])
 export class User extends BaseEntity {
   // #########################################################
   // WebSocketID - Created as part of user registration

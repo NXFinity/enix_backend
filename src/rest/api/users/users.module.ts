@@ -8,9 +8,13 @@ import { User } from './assets/entities/user.entity';
 import { Privacy } from './assets/entities/security/privacy.entity';
 import { Security } from './assets/entities/security/security.entity';
 import { Profile } from './assets/entities/profile.entity';
+import { LoggingModule } from '@logging/logging';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Profile, Privacy, Security])],
+  imports: [
+    TypeOrmModule.forFeature([User, Profile, Privacy, Security]),
+    LoggingModule,
+  ],
   controllers: [UsersController],
   providers: [UsersService],
   exports: [UsersService],

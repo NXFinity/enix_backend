@@ -1,8 +1,15 @@
 import { BaseEntity } from '@database/database';
-import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
 import { User } from '../user.entity';
 
 @Entity('userSecurity', { schema: 'account' })
+@Index(['verificationToken'])
+@Index(['passwordResetToken'])
+@Index(['isVerified'])
+@Index(['isBanned'])
+@Index(['isTimedOut'])
+@Index(['isVerified', 'isBanned', 'isTimedOut']) // Composite index for login checks
+@Index(['verificationToken', 'isVerified']) // Composite index for verification lookups
 export class Security extends BaseEntity {
   // User Verification
   @Column({ type: 'varchar', nullable: true })

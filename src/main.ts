@@ -8,7 +8,6 @@ import { setupSwagger } from './functions/swagger.function';
 import * as session from 'express-session';
 import * as cookieParser from 'cookie-parser';
 import { SessionStoreConfig } from './config/session-store.config';
-import { HttpExceptionFilter } from './filters/http-exception.filter';
 
 const chalk = require('chalk');
 const logger = new Logger('Bootstrap');
@@ -43,8 +42,13 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
 
-  // Global exception filter to hide stack traces in production
-  app.useGlobalFilters(new HttpExceptionFilter(configService));
+  // V1 PREFIX FOR ALL ROUTES
+  const globalPrefix = 'v1';
+  app.setGlobalPrefix(globalPrefix);
+  if (process.env.NODE_ENV === 'development') {
+    // SWAGGER
+    setupSwagger(app);
+  }
 
   // Initialize the app to ensure all modules are initialized (including Redis)
   await app.init();
@@ -83,14 +87,6 @@ async function bootstrap() {
   const database = isProductionEnv
     ? configService.get('POSTGRES_DB')
     : configService.get('POSTGRES_DB_DEV');
-
-  // V1 PREFIX FOR ALL ROUTES
-  const globalPrefix = 'v1';
-  app.setGlobalPrefix(globalPrefix);
-  if (process.env.NODE_ENV === 'development') {
-    // SWAGGER
-    setupSwagger(app);
-  }
 
   // VERSIONING
   app.enableVersioning({

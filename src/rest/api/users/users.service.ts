@@ -14,6 +14,13 @@ import { Profile } from './assets/entities/profile.entity';
 import { Privacy } from './assets/entities/security/privacy.entity';
 import { ROLE } from '../../../security/roles/assets/enum/role.enum';
 import { Security } from './assets/entities/security/security.entity';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
+import {
+  PaginationResponse,
+  PaginationMeta,
+} from '../../../common/interfaces/pagination-response.interface';
+import { LoggingService } from '@logging/logging';
+import { LogCategory } from '@logging/logging';
 
 @Injectable()
 export class UsersService {
@@ -25,6 +32,7 @@ export class UsersService {
     private readonly privacyRepository: Repository<Privacy>,
     @InjectRepository(Security)
     private readonly securityRepository: Repository<Security>,
+    private readonly loggingService: LoggingService,
   ) {}
 
   // #########################################################
@@ -86,16 +94,74 @@ export class UsersService {
   // FIND OPTIONS - AFTER CREATE
   // #########################################################
 
-  // Find All Users
-  async findAll() {
+  // Find All Users with Pagination
+  async findAll(
+    paginationDto: PaginationDto = {},
+  ): Promise<PaginationResponse<User>> {
     try {
-      return this.userRepository
+      const page = paginationDto.page || 1;
+      const limit = paginationDto.limit || 10;
+      const sortBy = paginationDto.sortBy || 'dateCreated';
+      const sortOrder = paginationDto.sortOrder || 'DESC';
+      const skip = (page - 1) * limit;
+
+      // Validate sortBy field to prevent SQL injection
+      const allowedSortFields = [
+        'dateCreated',
+        'username',
+        'displayName',
+        'email',
+        'role',
+      ];
+      const safeSortBy = allowedSortFields.includes(sortBy)
+        ? sortBy
+        : 'dateCreated';
+      const safeSortOrder = sortOrder === 'ASC' ? 'ASC' : 'DESC';
+
+      // Build base query for counting (without joins for performance)
+      const countQueryBuilder = this.userRepository
+        .createQueryBuilder('user')
+        .orderBy(`user.${safeSortBy}`, safeSortOrder);
+
+      // Get total count (before pagination)
+      const total = await countQueryBuilder.getCount();
+
+      // Build query for paginated results
+      const queryBuilder = this.userRepository
         .createQueryBuilder('user')
         .leftJoinAndSelect('user.profile', 'profile')
-        .select()
-        .getMany();
+        .orderBy(`user.${safeSortBy}`, safeSortOrder)
+        .skip(skip)
+        .take(limit);
+
+      // Get paginated results
+      const users = await queryBuilder.getMany();
+
+      // Calculate pagination metadata
+      const totalPages = Math.ceil(total / limit);
+      const meta: PaginationMeta = {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      };
+
+      return {
+        data: users,
+        meta,
+      };
     } catch (error) {
-      console.error('Error finding all users:', error.message, error.stack);
+      this.loggingService.error(
+        'Error finding all users',
+        error instanceof Error ? error.stack : undefined,
+        'UsersService',
+        {
+          category: LogCategory.DATABASE,
+          error: error instanceof Error ? error : new Error(String(error)),
+        },
+      );
       throw new InternalServerErrorException('Failed to find all users');
     }
   }
@@ -116,7 +182,16 @@ export class UsersService {
 
       return user;
     } catch (error) {
-      console.error('Error finding user by id:', error.message, error.stack);
+      this.loggingService.error(
+        `Error finding user by id: ${id}`,
+        error instanceof Error ? error.stack : undefined,
+        'UsersService',
+        {
+          category: LogCategory.DATABASE,
+          error: error instanceof Error ? error : new Error(String(error)),
+          metadata: { userId: id },
+        },
+      );
       throw new InternalServerErrorException('Failed to find user by id');
     }
   }
@@ -137,10 +212,15 @@ export class UsersService {
 
       return user;
     } catch (error) {
-      console.error(
-        'Error finding user by username:',
-        error.message,
-        error.stack,
+      this.loggingService.error(
+        `Error finding user by username: ${username}`,
+        error instanceof Error ? error.stack : undefined,
+        'UsersService',
+        {
+          category: LogCategory.DATABASE,
+          error: error instanceof Error ? error : new Error(String(error)),
+          metadata: { username },
+        },
       );
       throw new InternalServerErrorException('Failed to find user by username');
     }
@@ -162,7 +242,16 @@ export class UsersService {
 
       return user;
     } catch (error) {
-      console.error('Error finding user by email:', error.message, error.stack);
+      this.loggingService.error(
+        'Error finding user by email',
+        error instanceof Error ? error.stack : undefined,
+        'UsersService',
+        {
+          category: LogCategory.DATABASE,
+          error: error instanceof Error ? error : new Error(String(error)),
+          metadata: { email },
+        },
+      );
       throw new InternalServerErrorException('Failed to find user by email');
     }
   }
@@ -175,10 +264,15 @@ export class UsersService {
         .where('user.email = :email', { email })
         .getOne();
     } catch (error) {
-      console.error(
-        'Error checking user by email:',
-        error.message,
-        error.stack,
+      this.loggingService.error(
+        'Error checking user by email',
+        error instanceof Error ? error.stack : undefined,
+        'UsersService',
+        {
+          category: LogCategory.DATABASE,
+          error: error instanceof Error ? error : new Error(String(error)),
+          metadata: { email },
+        },
       );
       return null;
     }
@@ -192,10 +286,15 @@ export class UsersService {
         .where('user.username = :username', { username })
         .getOne();
     } catch (error) {
-      console.error(
-        'Error checking user by username:',
-        error.message,
-        error.stack,
+      this.loggingService.error(
+        'Error checking user by username',
+        error instanceof Error ? error.stack : undefined,
+        'UsersService',
+        {
+          category: LogCategory.DATABASE,
+          error: error instanceof Error ? error : new Error(String(error)),
+          metadata: { username },
+        },
       );
       return null;
     }
@@ -226,7 +325,16 @@ export class UsersService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      console.error('Error getting current user:', error.message, error.stack);
+      this.loggingService.error(
+        `Error getting current user: ${userId}`,
+        error instanceof Error ? error.stack : undefined,
+        'UsersService',
+        {
+          category: LogCategory.USER_MANAGEMENT,
+          error: error instanceof Error ? error : new Error(String(error)),
+          metadata: { userId },
+        },
+      );
       throw new InternalServerErrorException('Failed to get current user');
     }
   }
@@ -257,10 +365,14 @@ export class UsersService {
         relations: ['user'],
       });
     } catch (error) {
-      console.error(
-        'Error finding security by verification token:',
-        error.message,
-        error.stack,
+      this.loggingService.error(
+        'Error finding security by verification token',
+        error instanceof Error ? error.stack : undefined,
+        'UsersService',
+        {
+          category: LogCategory.DATABASE,
+          error: error instanceof Error ? error : new Error(String(error)),
+        },
       );
       return null;
     }
@@ -286,10 +398,15 @@ export class UsersService {
         relations: ['user'],
       });
     } catch (error) {
-      console.error(
-        'Error finding security by user email:',
-        error.message,
-        error.stack,
+      this.loggingService.error(
+        'Error finding security by user email',
+        error instanceof Error ? error.stack : undefined,
+        'UsersService',
+        {
+          category: LogCategory.DATABASE,
+          error: error instanceof Error ? error : new Error(String(error)),
+          metadata: { email },
+        },
       );
       return null;
     }
@@ -303,10 +420,15 @@ export class UsersService {
         relations: ['security'],
       });
     } catch (error) {
-      console.error(
-        'Error finding user with security by email:',
-        error.message,
-        error.stack,
+      this.loggingService.error(
+        'Error finding user with security by email',
+        error instanceof Error ? error.stack : undefined,
+        'UsersService',
+        {
+          category: LogCategory.DATABASE,
+          error: error instanceof Error ? error : new Error(String(error)),
+          metadata: { email },
+        },
       );
       return null;
     }
@@ -324,10 +446,15 @@ export class UsersService {
       user.password = newPassword;
       await this.userRepository.save(user);
     } catch (error) {
-      console.error(
-        'Error updating user password:',
-        error.message,
-        error.stack,
+      this.loggingService.error(
+        `Error updating user password: ${userId}`,
+        error instanceof Error ? error.stack : undefined,
+        'UsersService',
+        {
+          category: LogCategory.USER_MANAGEMENT,
+          error: error instanceof Error ? error : new Error(String(error)),
+          metadata: { userId },
+        },
       );
       throw new InternalServerErrorException('Failed to update password');
     }
@@ -360,10 +487,14 @@ export class UsersService {
         relations: ['user'],
       });
     } catch (error) {
-      console.error(
-        'Error finding security by password reset token:',
-        error.message,
-        error.stack,
+      this.loggingService.error(
+        'Error finding security by password reset token',
+        error instanceof Error ? error.stack : undefined,
+        'UsersService',
+        {
+          category: LogCategory.DATABASE,
+          error: error instanceof Error ? error : new Error(String(error)),
+        },
       );
       return null;
     }
@@ -548,7 +679,16 @@ export class UsersService {
       ) {
         throw error;
       }
-      console.error('Error updating user:', error.message, error.stack);
+      this.loggingService.error(
+        `Error updating user: ${id}`,
+        error instanceof Error ? error.stack : undefined,
+        'UsersService',
+        {
+          category: LogCategory.USER_MANAGEMENT,
+          error: error instanceof Error ? error : new Error(String(error)),
+          metadata: { userId: id },
+        },
+      );
       throw new InternalServerErrorException('Failed to update user');
     }
   }
@@ -574,7 +714,16 @@ export class UsersService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      console.error('Error deleting user:', error.message, error.stack);
+      this.loggingService.error(
+        `Error deleting user: ${id}`,
+        error instanceof Error ? error.stack : undefined,
+        'UsersService',
+        {
+          category: LogCategory.USER_MANAGEMENT,
+          error: error instanceof Error ? error : new Error(String(error)),
+          metadata: { userId: id },
+        },
+      );
       throw new InternalServerErrorException('Failed to delete user');
     }
   }
