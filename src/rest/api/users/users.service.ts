@@ -42,17 +42,12 @@ export class UsersService {
   }): Promise<User> {
     // Check if user already exists
     const existingEmail = await this.existsByEmail(user.email);
-    if (existingEmail) {
-      throw new HttpException(
-        'User with this email already exists',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
     const existingUsername = await this.existsByUsername(user.username);
-    if (existingUsername) {
+
+    // Generic error message to prevent user enumeration
+    if (existingEmail || existingUsername) {
       throw new HttpException(
-        'User with this username already exists',
+        'User creation failed. Please check your information and try again.',
         HttpStatus.BAD_REQUEST,
       );
     }

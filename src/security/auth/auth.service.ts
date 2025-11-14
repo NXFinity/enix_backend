@@ -49,17 +49,12 @@ export class AuthService {
 
     // Check if user already exists
     const existingEmail = await this.usersService.existsByEmail(email);
-    if (existingEmail) {
-      throw new HttpException(
-        'User with this email already exists',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
     const existingUsername = await this.usersService.existsByUsername(username);
-    if (existingUsername) {
+
+    // Generic error message to prevent user enumeration
+    if (existingEmail || existingUsername) {
       throw new HttpException(
-        'User with this username already exists',
+        'Registration failed. Please check your information and try again.',
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -155,10 +150,11 @@ export class AuthService {
 
     // Find user by email
     const user = await this.usersService.existsByEmail(email);
+    // Generic error message to prevent user enumeration
     if (!user) {
       throw new HttpException(
-        'User with this email does not exist',
-        HttpStatus.NOT_FOUND,
+        'If an account with that email exists and is not verified, a verification email will be sent.',
+        HttpStatus.OK, // Return 200 to prevent enumeration
       );
     }
 
@@ -217,16 +213,11 @@ export class AuthService {
 
     // Find user with security relation
     const user = await this.usersService.findUserWithSecurityByEmail(email);
-    if (!user) {
-      throw new HttpException(
-        'Invalid email or password',
-        HttpStatus.UNAUTHORIZED,
-      );
-    }
 
-    // Verify password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
+    // Verify password - use same generic error for both cases to prevent enumeration
+    const isPasswordValid =
+      user && (await bcrypt.compare(password, user.password));
+    if (!user || !isPasswordValid) {
       throw new HttpException(
         'Invalid email or password',
         HttpStatus.UNAUTHORIZED,

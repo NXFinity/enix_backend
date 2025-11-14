@@ -43,6 +43,9 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
 
+  // Global exception filter to hide stack traces in production
+  app.useGlobalFilters(new HttpExceptionFilter(configService));
+
   // Initialize the app to ensure all modules are initialized (including Redis)
   await app.init();
 
