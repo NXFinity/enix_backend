@@ -22,11 +22,11 @@ import {
 import { StorageService } from './storage.service';
 import { UploadFileDto, UploadResponseDto } from './assets/dto/upload-file.dto';
 import { CurrentUser } from '../../security/auth/decorators/currentUser.decorator';
-import { User } from '../../rest/api/users/assets/entities/user.entity';
+import { User } from '../api/users/assets/entities/user.entity';
 import { StorageType } from './assets/enum/storage-type.enum';
 import { memoryStorage } from 'multer';
 
-@ApiTags('Storage')
+@ApiTags('Storage Management')
 @ApiBearerAuth()
 @Controller('storage')
 export class StorageController {
@@ -59,7 +59,8 @@ export class StorageController {
         storageType: {
           type: 'string',
           enum: Object.values(StorageType),
-          description: 'Storage type (profile, media, documents, temp, backups)',
+          description:
+            'Storage type (profile, media, documents, temp, backups)',
           example: StorageType.PROFILE,
         },
         subType: {
@@ -105,10 +106,7 @@ export class StorageController {
     }
 
     // Validate sub-type for profile storage
-    if (
-      uploadDto.storageType === StorageType.PROFILE &&
-      !uploadDto.subType
-    ) {
+    if (uploadDto.storageType === StorageType.PROFILE && !uploadDto.subType) {
       throw new BadRequestException(
         'subType is required for profile storage. Allowed values: avatar, cover, offline, chat',
       );

@@ -19,6 +19,7 @@
 - [Security Features](#security-features)
 - [Libraries & Modules](#libraries--modules)
 - [Development](#development)
+- [Docker](#docker)
 - [Production Deployment](#production-deployment)
 
 ---
@@ -463,6 +464,111 @@ npm run test:e2e       # Run E2E tests
 5. **Sanitization** - Apply sanitization decorators to DTO fields
 6. **Transactions** - Wrap multi-entity operations in transactions
 7. **Logging** - Use structured logging with context and categories
+
+---
+
+## 🐳 Docker
+
+### Docker Hub
+
+The backend Docker image is available on Docker Hub:
+
+**Image:** [oneorg/balpha](https://hub.docker.com/r/oneorg/balpha)
+
+### Pull and Run
+
+```bash
+# Pull the latest image
+docker pull oneorg/balpha
+
+# Run the container
+docker run -p 3021:3021 \
+  -e NODE_ENV=production \
+  -e POSTGRES_HOST=your-db-host \
+  -e POSTGRES_PORT=5432 \
+  -e POSTGRES_USER=your-db-user \
+  -e POSTGRES_PASSWORD=your-db-password \
+  -e POSTGRES_DB=your-db-name \
+  -e REDIS_HOST=your-redis-host \
+  -e REDIS_PORT=6379 \
+  -e REDIS_PASSWORD=your-redis-password \
+  -e JWT_SECRET=your-jwt-secret \
+  -e DO_SPACES_KEY=your-spaces-key \
+  -e DO_SPACES_SECRET=your-spaces-secret \
+  -e DO_SPACES_BUCKET=your-bucket \
+  -e DO_SPACES_BUCKET_ENDPOINT=your-endpoint \
+  --env-file .env.production \
+  oneorg/balpha
+```
+
+### Build Locally
+
+```bash
+# Build the Docker image
+npm run docker:build
+
+# Run the container locally
+npm run docker:run
+```
+
+### Docker Compose (Optional)
+
+For local development with Docker Compose, create a `docker-compose.yml`:
+
+```yaml
+version: '3.8'
+
+services:
+  backend:
+    image: oneorg/balpha
+    # or build locally:
+    # build: .
+    ports:
+      - "3021:3021"
+    environment:
+      - NODE_ENV=production
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+    env_file:
+      - .env.production
+    depends_on:
+      - postgres
+      - redis
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3021/v1/health/liveness', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 40s
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: your_db
+      POSTGRES_USER: your_user
+      POSTGRES_PASSWORD: your_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass your_redis_password
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:
+```
+
+### Docker Image Details
+
+- **Base Image:** `node:22-alpine`
+- **Multi-stage Build:** Yes (optimized for production)
+- **Non-root User:** Runs as `nestjs` user (UID 1001)
+- **Health Check:** Built-in health check endpoint
+- **Port:** 3021 (exposed)
+- **Size:** Optimized Alpine-based image
 
 ---
 

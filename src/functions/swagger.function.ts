@@ -25,6 +25,16 @@ export function setupSwagger(app: INestApplication) {
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, options);
+  
+  // Sort tags alphabetically
+  if (document.tags && document.tags.length > 0) {
+    document.tags.sort((a, b) => {
+      const nameA = (a.name || '').toLowerCase();
+      const nameB = (b.name || '').toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+  }
+  
   const extraOptions = {
     swaggerOptions: {
       persistAuthorization: true,
@@ -33,6 +43,7 @@ export function setupSwagger(app: INestApplication) {
       docExpansion: 'none',
       filter: true,
       showRequestDuration: true,
+      tagsSorter: 'alpha', // Sort tags alphabetically in Swagger UI
     },
     customFavicon: 'https://metaenix.com/favicon.ico',
     customSiteTitle: 'Meta EN|IX API Documentation',

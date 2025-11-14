@@ -9,7 +9,7 @@ import {
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { RedisService } from '@redis/redis';
 
-@ApiTags('Health')
+@ApiTags('Health Management | Monitoring')
 @Controller('health')
 export class HealthController {
   constructor(

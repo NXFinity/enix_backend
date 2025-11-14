@@ -7,7 +7,7 @@ import { CheckPermission } from './assets/decorators/check-permission.decorator'
 import { ROLE } from './assets/enum/role.enum';
 import { Permission } from './assets/enum/permission.enum';
 
-@ApiTags('Roles & Permissions')
+@ApiTags('Security Management | Roles & Permissions')
 @Controller('roles')
 @UseGuards(RoleGuard)
 export class RolesController {

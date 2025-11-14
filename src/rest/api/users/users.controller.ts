@@ -26,7 +26,7 @@ import { AdminGuard } from '../../../security/auth/guards/admin.guard';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { Public } from '../../../security/auth/decorators/public.decorator';
 
-@ApiTags('Users')
+@ApiTags('Account Management | Users')
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}

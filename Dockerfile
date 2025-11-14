@@ -17,8 +17,11 @@ RUN npm ci
 COPY src ./src
 COPY libs ./libs
 
-# Build the application
+# Build the application (this builds both src and all libs)
 RUN npm run build
+
+# Verify libraries were built
+RUN ls -la dist/libs/ || echo "Warning: libs directory not found"
 
 # Stage 2: Production stage
 FROM node:22-alpine AS production
@@ -34,14 +37,25 @@ RUN addgroup -g 1001 -S nodejs && \
 COPY package*.json ./
 
 # Install production dependencies only
-RUN npm ci --only=production && \
+RUN npm ci --omit=dev && \
     npm cache clean --force
 
-# Copy built application from builder stage
+# Copy built application from builder stage (includes src and libs)
+# The dist folder structure after build:
+#   dist/
+#     src/          # Main application code
+#     libs/         # Built libraries (caching, database, email, kafka, logging, redis, throttle)
+#       caching/
+#       database/
+#       email/
+#       kafka/
+#       logging/
+#       redis/
+#       throttle/
 COPY --from=builder /app/dist ./dist
 
-# Copy necessary assets if any
-COPY --from=builder /app/dist/src/assets ./dist/src/assets 2>/dev/null || true
+# Verify libs were copied successfully
+RUN ls -la dist/libs/ && echo "Libraries copied successfully"
 
 # Change ownership to non-root user
 RUN chown -R nestjs:nodejs /app
@@ -57,5 +71,5 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3021/v1/health/liveness', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 # Start the application
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/src/main.js"]
 

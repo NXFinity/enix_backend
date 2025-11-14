@@ -30,7 +30,7 @@ import {
   PASSWORD_RESET_TOKEN_EXPIRY_HOURS,
 } from '../../common/constants/app.constants';
 
-@ApiTags('Authentication')
+@ApiTags('Security Management | Authentication')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
