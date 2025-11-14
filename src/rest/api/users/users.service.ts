@@ -12,7 +12,7 @@ import { User } from './assets/entities/user.entity';
 import { Repository } from 'typeorm';
 import { Profile } from './assets/entities/profile.entity';
 import { Privacy } from './assets/entities/security/privacy.entity';
-import { ROLE } from '../../../security/roles/assets/enum/role.enum';
+import { ROLE } from '../../../security/roles';
 import { Security } from './assets/entities/security/security.entity';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import {
@@ -21,6 +21,7 @@ import {
 } from '../../../common/interfaces/pagination-response.interface';
 import { LoggingService } from '@logging/logging';
 import { LogCategory } from '@logging/logging';
+import { CachingService } from '@caching/caching';
 
 @Injectable()
 export class UsersService {
@@ -33,6 +34,7 @@ export class UsersService {
     @InjectRepository(Security)
     private readonly securityRepository: Repository<Security>,
     private readonly loggingService: LoggingService,
+    private readonly cachingService: CachingService,
   ) {}
 
   // #########################################################
@@ -118,19 +120,33 @@ export class UsersService {
         : 'dateCreated';
       const safeSortOrder = sortOrder === 'ASC' ? 'ASC' : 'DESC';
 
-      // Build base query for counting (without joins for performance)
+      // Build base query for counting - only count public users
       const countQueryBuilder = this.userRepository
         .createQueryBuilder('user')
-        .orderBy(`user.${safeSortBy}`, safeSortOrder);
+        .where('user.isPublic = :isPublic', { isPublic: true });
 
       // Get total count (before pagination)
       const total = await countQueryBuilder.getCount();
 
-      // Build query for paginated results
+      // Build query for paginated results - only select safe fields
       const queryBuilder = this.userRepository
         .createQueryBuilder('user')
         .leftJoinAndSelect('user.profile', 'profile')
+        .where('user.isPublic = :isPublic', { isPublic: true })
         .orderBy(`user.${safeSortBy}`, safeSortOrder)
+        .select([
+          'user.id',
+          'user.username',
+          'user.displayName',
+          'user.email',
+          'user.isPublic',
+          'user.role',
+          'user.dateCreated',
+          'user.dateUpdated',
+          'profile.id',
+          'profile.avatar',
+          'profile.cover',
+        ])
         .skip(skip)
         .take(limit);
 
@@ -169,8 +185,8 @@ export class UsersService {
   // Find by ID
   async findOne(id: string): Promise<User> {
     try {
-      const [user] = await Promise.all([
-        this.userRepository
+      return await this.cachingService.getOrSetUser('id', id, async () => {
+        const user = await this.userRepository
           .createQueryBuilder('user')
           .leftJoinAndSelect('user.profile', 'profile')
           .where('user.id = :id', { id })
@@ -181,15 +197,18 @@ export class UsersService {
             'user.isPublic',
             'profile.id',
           ])
-          .getOne(),
-      ]);
+          .getOne();
 
-      if (!user) {
-        throw new NotFoundException(`User with id ${id} not found`);
-      }
+        if (!user) {
+          throw new NotFoundException(`User with id ${id} not found`);
+        }
 
-      return user;
+        return user;
+      });
     } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
       this.loggingService.error(
         `Error finding user by id: ${id}`,
         error instanceof Error ? error.stack : undefined,
@@ -207,25 +226,36 @@ export class UsersService {
   // Find by Username
   async findByUsername(username: string): Promise<User> {
     try {
-      const user = await this.userRepository
-        .createQueryBuilder('user')
-        .leftJoinAndSelect('user.profile', 'profile')
-        .where('user.username = :username', { username })
-        .select([
-          'user.id',
-          'user.username',
-          'user.email',
-          'user.isPublic',
-          'profile.id',
-        ])
-        .getOne();
+      return await this.cachingService.getOrSetUser(
+        'username',
+        username,
+        async () => {
+          const user = await this.userRepository
+            .createQueryBuilder('user')
+            .leftJoinAndSelect('user.profile', 'profile')
+            .where('user.username = :username', { username })
+            .select([
+              'user.id',
+              'user.username',
+              'user.email',
+              'user.isPublic',
+              'profile.id',
+            ])
+            .getOne();
 
-      if (!user) {
-        throw new NotFoundException(`User with username ${username} not found`);
-      }
+          if (!user) {
+            throw new NotFoundException(
+              `User with username ${username} not found`,
+            );
+          }
 
-      return user;
+          return user;
+        },
+      );
     } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
       this.loggingService.error(
         `Error finding user by username: ${username}`,
         error instanceof Error ? error.stack : undefined,
@@ -243,25 +273,34 @@ export class UsersService {
   // Find by Email Address
   async findByEmail(email: string): Promise<User> {
     try {
-      const user = await this.userRepository
-        .createQueryBuilder('user')
-        .leftJoinAndSelect('user.profile', 'profile')
-        .where('user.email = :email', { email })
-        .select([
-          'user.id',
-          'user.username',
-          'user.email',
-          'user.isPublic',
-          'profile.id',
-        ]) // keep this if you want all columns; later you can explicitly define what to select
-        .getOne();
+      return await this.cachingService.getOrSetUser(
+        'email',
+        email,
+        async () => {
+          const user = await this.userRepository
+            .createQueryBuilder('user')
+            .leftJoinAndSelect('user.profile', 'profile')
+            .where('user.email = :email', { email })
+            .select([
+              'user.id',
+              'user.username',
+              'user.email',
+              'user.isPublic',
+              'profile.id',
+            ]) // keep this if you want all columns; later you can explicitly define what to select
+            .getOne();
 
-      if (!user) {
-        throw new NotFoundException(`User with email ${email} not found`);
-      }
+          if (!user) {
+            throw new NotFoundException(`User with email ${email} not found`);
+          }
 
-      return user;
+          return user;
+        },
+      );
     } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
       this.loggingService.error(
         'Error finding user by email',
         error instanceof Error ? error.stack : undefined,
@@ -323,19 +362,25 @@ export class UsersService {
   // Find user by websocketId (for WebSocket authentication)
   async findByWebsocketId(websocketId: string): Promise<User | null> {
     try {
-      return await this.userRepository
-        .createQueryBuilder('user')
-        .where('user.websocketId = :websocketId', { websocketId })
-        .select([
-          'user.id',
-          'user.username',
-          'user.displayName',
-          'user.email',
-          'user.websocketId',
-          'user.role',
-          'user.isPublic',
-        ])
-        .getOne();
+      return await this.cachingService.getOrSetUser(
+        'websocketId',
+        websocketId,
+        async () => {
+          return await this.userRepository
+            .createQueryBuilder('user')
+            .where('user.websocketId = :websocketId', { websocketId })
+            .select([
+              'user.id',
+              'user.username',
+              'user.displayName',
+              'user.email',
+              'user.websocketId',
+              'user.role',
+              'user.isPublic',
+            ])
+            .getOne();
+        },
+      );
     } catch (error) {
       this.loggingService.error(
         `Error finding user by websocketId: ${websocketId}`,
@@ -357,21 +402,32 @@ export class UsersService {
 
   async getMe(userId: string): Promise<User> {
     try {
-      const user = await this.userRepository
-        .createQueryBuilder('user')
-        .leftJoinAndSelect('user.profile', 'profile')
-        .leftJoinAndSelect('user.privacy', 'privacy')
-        .leftJoinAndSelect('user.security', 'security')
-        .where('user.id = :id', { id: userId })
-        .getOne();
+      const user = await this.cachingService.getOrSetUser(
+        'id',
+        userId,
+        async () => {
+          const userData = await this.userRepository
+            .createQueryBuilder('user')
+            .leftJoinAndSelect('user.profile', 'profile')
+            .leftJoinAndSelect('user.privacy', 'privacy')
+            .leftJoinAndSelect('user.security', 'security')
+            .where('user.id = :id', { id: userId })
+            .getOne();
 
-      if (!user) {
-        throw new NotFoundException(`User with id ${userId} not found`);
-      }
+          if (!userData) {
+            throw new NotFoundException(`User with id ${userId} not found`);
+          }
 
-      // Remove password from response
-      const { password, ...userWithoutPassword } = user;
-      return userWithoutPassword as User;
+          // Remove password from response
+          const { password, ...userWithoutPassword } = userData;
+          return userWithoutPassword as User;
+        },
+        {
+          tags: ['user', `user:${userId}`, 'user:me'],
+        },
+      );
+
+      return user;
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;
@@ -439,6 +495,28 @@ export class UsersService {
     security.dateVerified = dateVerified;
     security.verificationToken = null; // Clear the token after verification
     await this.securityRepository.save(security);
+
+    // Invalidate user cache after verification status update
+    if (security.user?.id) {
+      try {
+        await this.cachingService.invalidateUser(security.user.id);
+      } catch (cacheError) {
+        // Log cache invalidation error but don't fail the verification update
+        this.loggingService.error(
+          `Error invalidating cache after verification status update: ${security.user.id}`,
+          cacheError instanceof Error ? cacheError.stack : undefined,
+          'UsersService',
+          {
+            category: LogCategory.DATABASE,
+            error:
+              cacheError instanceof Error
+                ? cacheError
+                : new Error(String(cacheError)),
+            metadata: { userId: security.user.id },
+          },
+        );
+      }
+    }
   }
 
   // Find Security entity by user email
@@ -496,7 +574,30 @@ export class UsersService {
       }
       user.password = newPassword;
       await this.userRepository.save(user);
+
+      // Invalidate user cache after password update
+      try {
+        await this.cachingService.invalidateUser(userId);
+      } catch (cacheError) {
+        // Log cache invalidation error but don't fail the password update
+        this.loggingService.error(
+          `Error invalidating cache after password update: ${userId}`,
+          cacheError instanceof Error ? cacheError.stack : undefined,
+          'UsersService',
+          {
+            category: LogCategory.DATABASE,
+            error:
+              cacheError instanceof Error
+                ? cacheError
+                : new Error(String(cacheError)),
+            metadata: { userId },
+          },
+        );
+      }
     } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
       this.loggingService.error(
         `Error updating user password: ${userId}`,
         error instanceof Error ? error.stack : undefined,
@@ -721,6 +822,27 @@ export class UsersService {
         }
 
         const { password, ...userWithoutPassword } = updatedUser;
+
+        // Invalidate user cache after successful update
+        try {
+          await this.cachingService.invalidateUser(id);
+        } catch (cacheError) {
+          // Log cache invalidation error but don't fail the update
+          this.loggingService.error(
+            `Error invalidating cache for user: ${id}`,
+            cacheError instanceof Error ? cacheError.stack : undefined,
+            'UsersService',
+            {
+              category: LogCategory.DATABASE,
+              error:
+                cacheError instanceof Error
+                  ? cacheError
+                  : new Error(String(cacheError)),
+              metadata: { userId: id },
+            },
+          );
+        }
+
         return userWithoutPassword as User;
       });
     } catch (error) {
@@ -761,6 +883,26 @@ export class UsersService {
 
       // Hard delete - permanently removes user and related entities (CASCADE)
       await this.userRepository.remove(user);
+
+      // Invalidate user cache after successful delete
+      try {
+        await this.cachingService.invalidateUser(id);
+      } catch (cacheError) {
+        // Log cache invalidation error but don't fail the delete
+        this.loggingService.error(
+          `Error invalidating cache for deleted user: ${id}`,
+          cacheError instanceof Error ? cacheError.stack : undefined,
+          'UsersService',
+          {
+            category: LogCategory.DATABASE,
+            error:
+              cacheError instanceof Error
+                ? cacheError
+                : new Error(String(cacheError)),
+            metadata: { userId: id },
+          },
+        );
+      }
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;

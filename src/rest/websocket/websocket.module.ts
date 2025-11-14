@@ -3,11 +3,10 @@ import { WebsocketService } from './websocket.service';
 import { WebsocketGateway } from './websocket.gateway';
 import { UsersModule } from '../api/users/users.module';
 import { RedisModule } from '@redis/redis';
-import { LoggingModule } from '@logging/logging';
 import { SessionStoreConfig } from '../../config/session-store.config';
 
 @Module({
-  imports: [UsersModule, RedisModule, LoggingModule],
+  imports: [UsersModule, RedisModule],
   providers: [WebsocketGateway, WebsocketService, SessionStoreConfig],
   exports: [WebsocketService],
 })

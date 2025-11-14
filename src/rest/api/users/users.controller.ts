@@ -24,6 +24,7 @@ import {
 } from '@nestjs/swagger';
 import { AdminGuard } from '../../../security/auth/guards/admin.guard';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { Public } from '../../../security/auth/decorators/public.decorator';
 
 @ApiTags('Users')
 @Controller('users')
@@ -44,9 +45,9 @@ export class UsersController {
   // #########################################################
 
   @Get()
-  @UseGuards(AdminGuard)
+  @Public()
   @ApiOperation({
-    summary: 'Get all users with pagination (admin only)',
+    summary: 'Get all users with pagination',
     description:
       'Returns paginated list of users. Supports pagination with page, limit, sortBy, and sortOrder query parameters.',
   })
@@ -99,7 +100,10 @@ export class UsersController {
         username: { type: 'string', example: 'johndoe' },
         displayName: { type: 'string', example: 'John Doe' },
         email: { type: 'string', example: 'john.doe@example.com' },
-        websocketId: { type: 'string', example: '123e4567-e89b-12d3-a456-426614174001' },
+        websocketId: {
+          type: 'string',
+          example: '123e4567-e89b-12d3-a456-426614174001',
+        },
         role: { type: 'string', example: 'Member' },
         isPublic: { type: 'boolean', example: true },
         dateCreated: { type: 'string', format: 'date-time' },
@@ -158,7 +162,9 @@ export class UsersController {
         message: {
           type: 'array',
           items: { type: 'string' },
-          example: ['User with id 123e4567-e89b-12d3-a456-426614174000 not found'],
+          example: [
+            'User with id 123e4567-e89b-12d3-a456-426614174000 not found',
+          ],
         },
         error: { type: 'string', example: 'Not Found' },
       },
@@ -172,6 +178,7 @@ export class UsersController {
     return this.usersService.getMe(userId);
   }
 
+  @Public()
   @Get('username/:username')
   @ApiOperation({
     summary: 'Find user by username (public profile)',
@@ -227,6 +234,7 @@ export class UsersController {
     return this.usersService.findByUsername(username);
   }
 
+  @Public()
   @Get(':id')
   @ApiOperation({
     summary: 'Find user by ID',
@@ -270,7 +278,9 @@ export class UsersController {
         message: {
           type: 'array',
           items: { type: 'string' },
-          example: ['User with id 123e4567-e89b-12d3-a456-426614174000 not found'],
+          example: [
+            'User with id 123e4567-e89b-12d3-a456-426614174000 not found',
+          ],
         },
         error: { type: 'string', example: 'Not Found' },
       },
@@ -354,7 +364,10 @@ export class UsersController {
       },
     },
   })
-  updateMe(@Req() request: AuthenticatedRequest, @Body() updateUserDto: UpdateUserDto) {
+  updateMe(
+    @Req() request: AuthenticatedRequest,
+    @Body() updateUserDto: UpdateUserDto,
+  ) {
     const userId = request.user?.id || request.session?.user?.id;
     if (!userId) {
       throw new UnauthorizedException('User not found in session');
@@ -431,7 +444,9 @@ export class UsersController {
         message: {
           type: 'array',
           items: { type: 'string' },
-          example: ['User with id 123e4567-e89b-12d3-a456-426614174000 not found'],
+          example: [
+            'User with id 123e4567-e89b-12d3-a456-426614174000 not found',
+          ],
         },
         error: { type: 'string', example: 'Not Found' },
       },
@@ -458,7 +473,10 @@ export class UsersController {
     schema: {
       type: 'object',
       properties: {
-        message: { type: 'string', example: 'User account deleted successfully' },
+        message: {
+          type: 'string',
+          example: 'User account deleted successfully',
+        },
       },
     },
   })
@@ -551,7 +569,9 @@ export class UsersController {
         message: {
           type: 'array',
           items: { type: 'string' },
-          example: ['User with id 123e4567-e89b-12d3-a456-426614174000 not found'],
+          example: [
+            'User with id 123e4567-e89b-12d3-a456-426614174000 not found',
+          ],
         },
         error: { type: 'string', example: 'Not Found' },
       },

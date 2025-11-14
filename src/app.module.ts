@@ -16,6 +16,7 @@ import * as Joi from 'joi';
 import { AuthGuard } from './security/auth/guards/auth.guard';
 import { ThrottleGuard } from '@throttle/throttle';
 import { HealthModule } from './services/health/health.module';
+import { StartupModule } from './services/startup/startup.module';
 
 // Configuration Variables
 
@@ -165,6 +166,7 @@ import { HealthModule } from './services/health/health.module';
     UsersModule,
     WebsocketModule,
     HealthModule,
+    StartupModule,
   ],
   controllers: [],
   providers: [

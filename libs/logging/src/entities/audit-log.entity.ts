@@ -1,5 +1,5 @@
 import { Entity, Column, Index } from 'typeorm';
-import { BaseEntity } from '@database/database';
+import { BaseEntity } from '@database/database/base/base.entity';
 import { LogLevel } from '../enums/log-level.enum';
 import { LogCategory } from '../enums/log-category.enum';
 

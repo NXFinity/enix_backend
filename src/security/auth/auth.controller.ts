@@ -33,15 +33,17 @@ import {
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {
-  }
+  constructor(private readonly authService: AuthService) {}
 
   // #########################################################
   // USER REGISTRATION
   // #########################################################
 
   @Public()
-  @Throttle({ limit: RATE_LIMITS.REGISTRATION.LIMIT, ttl: RATE_LIMITS.REGISTRATION.TTL })
+  @Throttle({
+    limit: RATE_LIMITS.REGISTRATION.LIMIT,
+    ttl: RATE_LIMITS.REGISTRATION.TTL,
+  })
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
@@ -64,11 +66,17 @@ export class AuthController {
         user: {
           type: 'object',
           properties: {
-            id: { type: 'string', example: '123e4567-e89b-12d3-a456-426614174000' },
+            id: {
+              type: 'string',
+              example: '123e4567-e89b-12d3-a456-426614174000',
+            },
             username: { type: 'string', example: 'johndoe' },
             displayName: { type: 'string', example: 'johndoe' },
             email: { type: 'string', example: 'john.doe@example.com' },
-            websocketId: { type: 'string', example: '123e4567-e89b-12d3-a456-426614174001' },
+            websocketId: {
+              type: 'string',
+              example: '123e4567-e89b-12d3-a456-426614174001',
+            },
             role: { type: 'string', example: 'Member' },
             dateCreated: { type: 'string', format: 'date-time' },
           },
@@ -86,7 +94,9 @@ export class AuthController {
         message: {
           type: 'array',
           items: { type: 'string' },
-          example: ['Registration failed. Please check your information and try again.'],
+          example: [
+            'Registration failed. Please check your information and try again.',
+          ],
         },
         error: { type: 'string', example: 'Bad Request' },
       },
@@ -101,13 +111,15 @@ export class AuthController {
   // #########################################################
 
   @Public()
-  @Throttle({ limit: RATE_LIMITS.EMAIL_VERIFICATION.LIMIT, ttl: RATE_LIMITS.EMAIL_VERIFICATION.TTL })
+  @Throttle({
+    limit: RATE_LIMITS.EMAIL_VERIFICATION.LIMIT,
+    ttl: RATE_LIMITS.EMAIL_VERIFICATION.TTL,
+  })
   @Post('verify-email')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Verify user email with verification token',
-    description:
-      `Verifies a user email address using the token sent to their email. Tokens expire after ${VERIFICATION_TOKEN_EXPIRY_MINUTES} minutes.`,
+    description: `Verifies a user email address using the token sent to their email. Tokens expire after ${VERIFICATION_TOKEN_EXPIRY_MINUTES} minutes.`,
   })
   @ApiBody({ type: VerifyDto })
   @ApiResponse({
@@ -120,7 +132,10 @@ export class AuthController {
         user: {
           type: 'object',
           properties: {
-            id: { type: 'string', example: '123e4567-e89b-12d3-a456-426614174000' },
+            id: {
+              type: 'string',
+              example: '123e4567-e89b-12d3-a456-426614174000',
+            },
             username: { type: 'string', example: 'johndoe' },
             displayName: { type: 'string', example: 'johndoe' },
             email: { type: 'string', example: 'john.doe@example.com' },
@@ -150,13 +165,15 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ limit: RATE_LIMITS.RESEND_VERIFICATION.LIMIT, ttl: RATE_LIMITS.RESEND_VERIFICATION.TTL })
+  @Throttle({
+    limit: RATE_LIMITS.RESEND_VERIFICATION.LIMIT,
+    ttl: RATE_LIMITS.RESEND_VERIFICATION.TTL,
+  })
   @Post('resend-verify-email')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Resend verification email with new token',
-    description:
-      `Resends a verification email with a new token. Previous tokens are invalidated. Rate limited to ${RATE_LIMITS.RESEND_VERIFICATION.LIMIT} requests per ${RATE_LIMITS.RESEND_VERIFICATION.TTL / 60} minutes.`,
+    description: `Resends a verification email with a new token. Previous tokens are invalidated. Rate limited to ${RATE_LIMITS.RESEND_VERIFICATION.LIMIT} requests per ${RATE_LIMITS.RESEND_VERIFICATION.TTL / 60} minutes.`,
   })
   @ApiBody({ type: ResendVerifyDto })
   @ApiResponse({
@@ -167,7 +184,8 @@ export class AuthController {
       properties: {
         message: {
           type: 'string',
-          example: 'Verification email has been resent. Please check your email.',
+          example:
+            'Verification email has been resent. Please check your email.',
         },
       },
     },
@@ -218,8 +236,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Login user with email and password',
-    description:
-      `Authenticates a user with email and password. Creates a session and stores user data including websocketId. Rate limited to ${RATE_LIMITS.LOGIN.LIMIT} attempts per ${RATE_LIMITS.LOGIN.TTL / 60} minutes.`,
+    description: `Authenticates a user with email and password. Creates a session and stores user data including websocketId. Rate limited to ${RATE_LIMITS.LOGIN.LIMIT} attempts per ${RATE_LIMITS.LOGIN.TTL / 60} minutes.`,
   })
   @ApiBody({ type: LoginDto })
   @ApiResponse({
@@ -232,11 +249,17 @@ export class AuthController {
         user: {
           type: 'object',
           properties: {
-            id: { type: 'string', example: '123e4567-e89b-12d3-a456-426614174000' },
+            id: {
+              type: 'string',
+              example: '123e4567-e89b-12d3-a456-426614174000',
+            },
             username: { type: 'string', example: 'johndoe' },
             displayName: { type: 'string', example: 'johndoe' },
             email: { type: 'string', example: 'john.doe@example.com' },
-            websocketId: { type: 'string', example: '123e4567-e89b-12d3-a456-426614174001' },
+            websocketId: {
+              type: 'string',
+              example: '123e4567-e89b-12d3-a456-426614174001',
+            },
             role: { type: 'string', example: 'Member' },
           },
         },
@@ -275,7 +298,10 @@ export class AuthController {
       },
     },
   })
-  async login(@Body() loginDto: LoginDto, @Req() request: AuthenticatedRequest) {
+  async login(
+    @Body() loginDto: LoginDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
     return this.authService.login(loginDto, request);
   }
 
@@ -324,14 +350,16 @@ export class AuthController {
   // USER CHANGE, FORGOT & RESET PASSWORD
   // #########################################################
 
-  @Throttle({ limit: RATE_LIMITS.PASSWORD_CHANGE.LIMIT, ttl: RATE_LIMITS.PASSWORD_CHANGE.TTL })
+  @Throttle({
+    limit: RATE_LIMITS.PASSWORD_CHANGE.LIMIT,
+    ttl: RATE_LIMITS.PASSWORD_CHANGE.TTL,
+  })
   @Post('change-password')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Change password for authenticated user',
-    description:
-      `Changes the password for the currently authenticated user. Requires current password verification. Rate limited to ${RATE_LIMITS.PASSWORD_CHANGE.LIMIT} changes per hour.`,
+    description: `Changes the password for the currently authenticated user. Requires current password verification. Rate limited to ${RATE_LIMITS.PASSWORD_CHANGE.LIMIT} changes per hour.`,
   })
   @ApiBody({ type: ChangeDto })
   @ApiResponse({
@@ -346,7 +374,8 @@ export class AuthController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Bad request - Current password incorrect or new password invalid',
+    description:
+      'Bad request - Current password incorrect or new password invalid',
     schema: {
       type: 'object',
       properties: {
@@ -384,13 +413,15 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ limit: RATE_LIMITS.FORGOT_PASSWORD.LIMIT, ttl: RATE_LIMITS.FORGOT_PASSWORD.TTL })
+  @Throttle({
+    limit: RATE_LIMITS.FORGOT_PASSWORD.LIMIT,
+    ttl: RATE_LIMITS.FORGOT_PASSWORD.TTL,
+  })
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Request password reset email',
-    description:
-      `Sends a password reset email if an account with the provided email exists. Does not reveal whether the email exists for security. Rate limited to ${RATE_LIMITS.FORGOT_PASSWORD.LIMIT} requests per hour.`,
+    description: `Sends a password reset email if an account with the provided email exists. Does not reveal whether the email exists for security. Rate limited to ${RATE_LIMITS.FORGOT_PASSWORD.LIMIT} requests per hour.`,
   })
   @ApiBody({ type: ForgotDto })
   @ApiResponse({
@@ -412,13 +443,15 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ limit: RATE_LIMITS.RESET_PASSWORD.LIMIT, ttl: RATE_LIMITS.RESET_PASSWORD.TTL })
+  @Throttle({
+    limit: RATE_LIMITS.RESET_PASSWORD.LIMIT,
+    ttl: RATE_LIMITS.RESET_PASSWORD.TTL,
+  })
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Reset password using reset token',
-    description:
-      `Resets the user password using the token sent via email. Tokens expire after ${PASSWORD_RESET_TOKEN_EXPIRY_HOURS} hour. Rate limited to ${RATE_LIMITS.RESET_PASSWORD.LIMIT} attempts per ${RATE_LIMITS.RESET_PASSWORD.TTL / 60} minutes.`,
+    description: `Resets the user password using the token sent via email. Tokens expire after ${PASSWORD_RESET_TOKEN_EXPIRY_HOURS} hour. Rate limited to ${RATE_LIMITS.RESET_PASSWORD.LIMIT} attempts per ${RATE_LIMITS.RESET_PASSWORD.TTL / 60} minutes.`,
   })
   @ApiBody({ type: ResetDto })
   @ApiResponse({
@@ -427,7 +460,10 @@ export class AuthController {
     schema: {
       type: 'object',
       properties: {
-        message: { type: 'string', example: 'Password has been reset successfully' },
+        message: {
+          type: 'string',
+          example: 'Password has been reset successfully',
+        },
       },
     },
   })

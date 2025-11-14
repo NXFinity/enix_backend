@@ -474,7 +474,6 @@ Monitor these endpoints:
 ## 📝 Additional Resources
 
 - **API Documentation:** `/v1` (Swagger UI in development)
-- **Audit Report:** `docs/backend/AUDIT_REPORT.md`
 - **Project Website:** [https://metaenix.com](https://metaenix.com)
 - **Support:** [https://metaenix.com/support](https://metaenix.com/support)
 
