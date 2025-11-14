@@ -36,11 +36,23 @@
       "@kafka/kafka/*": [
         "libs/kafka/src/*"
       ],
+      "@logging/logging": [
+        "libs/logging/src"
+      ],
+      "@logging/logging/*": [
+        "libs/logging/src/*"
+      ],
       "@redis/redis": [
         "libs/redis/src"
       ],
       "@redis/redis/*": [
         "libs/redis/src/*"
+      ],
+      "@throttle/throttle": [
+        "libs/throttle/src"
+      ],
+      "@throttle/throttle/*": [
+        "libs/throttle/src/*"
       ]
     }
   }

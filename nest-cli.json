@@ -34,6 +34,15 @@
         "tsConfigPath": "libs/kafka/tsconfig.lib.json"
       }
     },
+    "logging": {
+      "type": "library",
+      "root": "libs/logging",
+      "entryFile": "index",
+      "sourceRoot": "libs/logging/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/logging/tsconfig.lib.json"
+      }
+    },
     "redis": {
       "type": "library",
       "root": "libs/redis",
@@ -41,6 +50,15 @@
       "sourceRoot": "libs/redis/src",
       "compilerOptions": {
         "tsConfigPath": "libs/redis/tsconfig.lib.json"
+      }
+    },
+    "throttle": {
+      "type": "library",
+      "root": "libs/throttle",
+      "entryFile": "index",
+      "sourceRoot": "libs/throttle/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/throttle/tsconfig.lib.json"
       }
     }
   }

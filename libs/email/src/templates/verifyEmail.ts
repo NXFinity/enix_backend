@@ -193,17 +193,17 @@ export function getVerificationEmailTemplate(
           <div class="header">
             <img src="https://metaenix.com/images/logos/logo.png" alt="Meta EN|IX" class="logo">
           </div>
-          
+
           <div class="content">
             <h1>Verify Your Email</h1>
             <p class="message">Hey <span class="username">${username}</span>, welcome to Meta EN|IX! Click the button below to verify your email address.</p>
-            
+
             <div class="cta-container">
               <a href="${verificationUrl}" class="cta-button">Verify Email</a>
             </div>
-            
+
             <div class="divider">Or use code</div>
-            
+
             <div class="token-section">
               <div class="token-label">Verification Code</div>
               <div class="token-code">${token}</div>
@@ -211,12 +211,12 @@ export function getVerificationEmailTemplate(
                 <a href="${frontendUrl}/verify">Enter code here</a>
               </div>
             </div>
-            
+
             <div class="info">
-              <p>This link expires in 24 hours. If you didn't create an account, ignore this email.</p>
+              <p>This link expires in 15 minutes. If you didn't create an account, ignore this email.</p>
             </div>
           </div>
-          
+
           <div class="footer">
             <div class="footer-brand">Meta EN|IX</div>
             <div class="footer-links">

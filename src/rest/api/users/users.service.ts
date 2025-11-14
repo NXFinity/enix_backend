@@ -13,6 +13,7 @@ import { Repository } from 'typeorm';
 import { Profile } from './assets/entities/profile.entity';
 import { Privacy } from './assets/entities/security/privacy.entity';
 import { ROLE } from '../../../security/roles/assets/enum/role.enum';
+import { Security } from './assets/entities/security/security.entity';
 
 @Injectable()
 export class UsersService {
@@ -22,6 +23,8 @@ export class UsersService {
     private readonly profileRepository: Repository<Profile>,
     @InjectRepository(Privacy)
     private readonly privacyRepository: Repository<Privacy>,
+    @InjectRepository(Security)
+    private readonly securityRepository: Repository<Security>,
   ) {}
 
   // #########################################################
@@ -31,23 +34,57 @@ export class UsersService {
   // User Creation
   async create(user: {
     username: string;
+    displayName: string;
     email: string;
     password: string;
-    isVerified: boolean;
-    verificationToken: string;
-    role?: ROLE.Member;
+    websocketId: string;
+    role?: ROLE;
   }): Promise<User> {
-    const findByEmail = await this.findByEmail(user.email);
-    if (findByEmail) {
-      throw new HttpException('User already exists', HttpStatus.BAD_REQUEST);
+    // Check if user already exists
+    const existingEmail = await this.existsByEmail(user.email);
+    if (existingEmail) {
+      throw new HttpException(
+        'User with this email already exists',
+        HttpStatus.BAD_REQUEST,
+      );
     }
-    const newUser = await this.userRepository.save(user);
-    // Create Users Profile
-    const profile = new Profile();
-    profile.user = newUser;
-    await this.profileRepository.save(profile);
-    // Return User
-    return newUser;
+
+    const existingUsername = await this.existsByUsername(user.username);
+    if (existingUsername) {
+      throw new HttpException(
+        'User with this username already exists',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Use transaction to ensure all entities are created atomically
+    return await this.userRepository.manager.transaction(async (manager) => {
+      // Create User
+      const newUser = await manager.save(User, user);
+
+      // Create Users Security (will be updated with verification token by AuthService)
+      const security = new Security();
+      security.user = newUser;
+      security.isVerified = false;
+      security.isTwoFactorEnabled = false;
+      security.isBanned = false;
+      security.isTimedOut = false;
+      security.isAgedVerified = false;
+      await manager.save(Security, security);
+
+      // Create Users Profile
+      const profile = new Profile();
+      profile.user = newUser;
+      await manager.save(Profile, profile);
+
+      // Create Users Privacy
+      const privacy = new Privacy();
+      privacy.user = newUser;
+      await manager.save(Privacy, privacy);
+
+      // Return User
+      return newUser;
+    });
   }
 
   // #########################################################
@@ -135,34 +172,415 @@ export class UsersService {
     }
   }
 
+  // Check if user exists by email (returns null if not found, doesn't throw)
+  async existsByEmail(email: string): Promise<User | null> {
+    try {
+      return await this.userRepository
+        .createQueryBuilder('user')
+        .where('user.email = :email', { email })
+        .getOne();
+    } catch (error) {
+      console.error(
+        'Error checking user by email:',
+        error.message,
+        error.stack,
+      );
+      return null;
+    }
+  }
+
+  // Check if user exists by username (returns null if not found, doesn't throw)
+  async existsByUsername(username: string): Promise<User | null> {
+    try {
+      return await this.userRepository
+        .createQueryBuilder('user')
+        .where('user.username = :username', { username })
+        .getOne();
+    } catch (error) {
+      console.error(
+        'Error checking user by username:',
+        error.message,
+        error.stack,
+      );
+      return null;
+    }
+  }
+
+  // #########################################################
+  // GET CURRENT USER
+  // #########################################################
+
+  async getMe(userId: string): Promise<User> {
+    try {
+      const user = await this.userRepository
+        .createQueryBuilder('user')
+        .leftJoinAndSelect('user.profile', 'profile')
+        .leftJoinAndSelect('user.privacy', 'privacy')
+        .leftJoinAndSelect('user.security', 'security')
+        .where('user.id = :id', { id: userId })
+        .getOne();
+
+      if (!user) {
+        throw new NotFoundException(`User with id ${userId} not found`);
+      }
+
+      // Remove password from response
+      const { password, ...userWithoutPassword } = user;
+      return userWithoutPassword as User;
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      console.error('Error getting current user:', error.message, error.stack);
+      throw new InternalServerErrorException('Failed to get current user');
+    }
+  }
+
+  // Update Security entity with verification token
+  async updateSecurityVerification(
+    userId: string,
+    verificationToken: string,
+  ): Promise<void> {
+    const security = await this.securityRepository.findOne({
+      where: { user: { id: userId } },
+    });
+
+    if (security) {
+      security.verificationToken = verificationToken;
+      security.isVerified = false;
+      await this.securityRepository.save(security);
+    }
+  }
+
+  // Find Security entity by verification token
+  async findSecurityByVerificationToken(
+    token: string,
+  ): Promise<Security | null> {
+    try {
+      return await this.securityRepository.findOne({
+        where: { verificationToken: token },
+        relations: ['user'],
+      });
+    } catch (error) {
+      console.error(
+        'Error finding security by verification token:',
+        error.message,
+        error.stack,
+      );
+      return null;
+    }
+  }
+
+  // Update Security entity verification status
+  async updateSecurityVerificationStatus(
+    security: Security,
+    isVerified: boolean,
+    dateVerified: Date,
+  ): Promise<void> {
+    security.isVerified = isVerified;
+    security.dateVerified = dateVerified;
+    security.verificationToken = null; // Clear the token after verification
+    await this.securityRepository.save(security);
+  }
+
+  // Find Security entity by user email
+  async findSecurityByUserEmail(email: string): Promise<Security | null> {
+    try {
+      return await this.securityRepository.findOne({
+        where: { user: { email } },
+        relations: ['user'],
+      });
+    } catch (error) {
+      console.error(
+        'Error finding security by user email:',
+        error.message,
+        error.stack,
+      );
+      return null;
+    }
+  }
+
+  // Find user with security relation by email
+  async findUserWithSecurityByEmail(email: string): Promise<User | null> {
+    try {
+      return await this.userRepository.findOne({
+        where: { email },
+        relations: ['security'],
+      });
+    } catch (error) {
+      console.error(
+        'Error finding user with security by email:',
+        error.message,
+        error.stack,
+      );
+      return null;
+    }
+  }
+
+  // Update user password
+  async updateUserPassword(userId: string, newPassword: string): Promise<void> {
+    try {
+      const user = await this.userRepository.findOne({
+        where: { id: userId },
+      });
+      if (!user) {
+        throw new NotFoundException(`User with id ${userId} not found`);
+      }
+      user.password = newPassword;
+      await this.userRepository.save(user);
+    } catch (error) {
+      console.error(
+        'Error updating user password:',
+        error.message,
+        error.stack,
+      );
+      throw new InternalServerErrorException('Failed to update password');
+    }
+  }
+
+  // Update Security entity with password reset token
+  async updatePasswordResetToken(
+    userId: string,
+    token: string,
+    expiresAt: Date,
+  ): Promise<void> {
+    const security = await this.securityRepository.findOne({
+      where: { user: { id: userId } },
+    });
+
+    if (security) {
+      security.passwordResetToken = token;
+      security.passwordResetTokenExpires = expiresAt;
+      await this.securityRepository.save(security);
+    }
+  }
+
+  // Find Security entity by password reset token
+  async findSecurityByPasswordResetToken(
+    token: string,
+  ): Promise<Security | null> {
+    try {
+      return await this.securityRepository.findOne({
+        where: { passwordResetToken: token },
+        relations: ['user'],
+      });
+    } catch (error) {
+      console.error(
+        'Error finding security by password reset token:',
+        error.message,
+        error.stack,
+      );
+      return null;
+    }
+  }
+
+  // Clear password reset token
+  async clearPasswordResetToken(userId: string): Promise<void> {
+    const security = await this.securityRepository.findOne({
+      where: { user: { id: userId } },
+    });
+
+    if (security) {
+      security.passwordResetToken = null;
+      security.passwordResetTokenExpires = null;
+      await this.securityRepository.save(security);
+    }
+  }
+
   // #########################################################
   // UPDATE OPTIONS - AFTER FIND OPTIONS
   // #########################################################
 
-  async updateUser(id: string, updateUserDto: UpdateUserDto) {}
+  async updateUser(id: string, updateUserDto: UpdateUserDto): Promise<User> {
+    try {
+      // Get user with all relations
+      const user = await this.userRepository.findOne({
+        where: { id },
+        relations: ['profile', 'privacy', 'security'],
+      });
+
+      if (!user) {
+        throw new NotFoundException(`User with id ${id} not found`);
+      }
+
+      // Update User entity fields (only allowed fields)
+      if (updateUserDto.username !== undefined) {
+        // Check if username is already taken by another user
+        const existingUser = await this.existsByUsername(
+          updateUserDto.username,
+        );
+        if (existingUser && existingUser.id !== id) {
+          throw new HttpException(
+            'Username is already taken',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+        user.username = updateUserDto.username;
+      }
+
+      if (updateUserDto.displayName !== undefined) {
+        // Check if displayName is already taken by another user
+        const existingUser = await this.userRepository.findOne({
+          where: { displayName: updateUserDto.displayName },
+        });
+        if (existingUser && existingUser.id !== id) {
+          throw new HttpException(
+            'Display name is already taken',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+        user.displayName = updateUserDto.displayName;
+      }
+
+      if (updateUserDto.isPublic !== undefined) {
+        user.isPublic = updateUserDto.isPublic;
+      }
+
+      // Use transaction to ensure all updates are atomic
+      return await this.userRepository.manager.transaction(async (manager) => {
+        // Reload user within transaction to ensure we have latest data
+        const userInTransaction = await manager.findOne(User, {
+          where: { id },
+          relations: ['profile', 'privacy', 'security'],
+        });
+
+        if (!userInTransaction) {
+          throw new NotFoundException(`User with id ${id} not found`);
+        }
+
+        // Update user fields
+        if (updateUserDto.username !== undefined) {
+          userInTransaction.username = updateUserDto.username;
+        }
+        if (updateUserDto.displayName !== undefined) {
+          userInTransaction.displayName = updateUserDto.displayName;
+        }
+        if (updateUserDto.isPublic !== undefined) {
+          userInTransaction.isPublic = updateUserDto.isPublic;
+        }
+
+        // Save user changes
+        await manager.save(User, userInTransaction);
+
+        // Update Profile entity if provided
+        if (updateUserDto.profile) {
+          const profile = userInTransaction.profile || new Profile();
+          profile.user = userInTransaction;
+
+          if (updateUserDto.profile.firstName !== undefined) {
+            profile.firstName = updateUserDto.profile.firstName;
+          }
+          if (updateUserDto.profile.lastName !== undefined) {
+            profile.lastName = updateUserDto.profile.lastName;
+          }
+          if (updateUserDto.profile.bio !== undefined) {
+            profile.bio = updateUserDto.profile.bio;
+          }
+          if (updateUserDto.profile.location !== undefined) {
+            profile.location = updateUserDto.profile.location;
+          }
+          if (updateUserDto.profile.website !== undefined) {
+            profile.website = updateUserDto.profile.website;
+          }
+          if (updateUserDto.profile.dateOfBirth !== undefined) {
+            profile.dateOfBirth = new Date(updateUserDto.profile.dateOfBirth);
+          }
+          if (updateUserDto.profile.avatar !== undefined) {
+            profile.avatar = updateUserDto.profile.avatar;
+          }
+          if (updateUserDto.profile.cover !== undefined) {
+            profile.cover = updateUserDto.profile.cover;
+          }
+          if (updateUserDto.profile.banner !== undefined) {
+            profile.banner = updateUserDto.profile.banner;
+          }
+          if (updateUserDto.profile.offline !== undefined) {
+            profile.offline = updateUserDto.profile.offline;
+          }
+          if (updateUserDto.profile.chat !== undefined) {
+            profile.chat = updateUserDto.profile.chat;
+          }
+
+          await manager.save(Profile, profile);
+        }
+
+        // Update Privacy entity if provided
+        if (updateUserDto.privacy) {
+          const privacy = userInTransaction.privacy || new Privacy();
+          privacy.user = userInTransaction;
+
+          if (updateUserDto.privacy.isFollowerOnly !== undefined) {
+            privacy.isFollowerOnly = updateUserDto.privacy.isFollowerOnly;
+          }
+          if (updateUserDto.privacy.isSubscriberOnly !== undefined) {
+            privacy.isSubscriberOnly = updateUserDto.privacy.isSubscriberOnly;
+          }
+          if (updateUserDto.privacy.isMatureContent !== undefined) {
+            privacy.isMatureContent = updateUserDto.privacy.isMatureContent;
+          }
+          if (updateUserDto.privacy.allowMessages !== undefined) {
+            privacy.allowMessages = updateUserDto.privacy.allowMessages;
+          }
+          if (updateUserDto.privacy.allowNotifications !== undefined) {
+            privacy.allowNotifications =
+              updateUserDto.privacy.allowNotifications;
+          }
+          if (updateUserDto.privacy.allowFriendRequests !== undefined) {
+            privacy.allowFriendRequests =
+              updateUserDto.privacy.allowFriendRequests;
+          }
+
+          await manager.save(Privacy, privacy);
+        }
+
+        // Return updated user with all relations (without password)
+        const updatedUser = await manager.findOne(User, {
+          where: { id },
+          relations: ['profile', 'privacy', 'security'],
+        });
+
+        if (!updatedUser) {
+          throw new NotFoundException(`User with id ${id} not found`);
+        }
+
+        const { password, ...userWithoutPassword } = updatedUser;
+        return userWithoutPassword as User;
+      });
+    } catch (error) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof HttpException
+      ) {
+        throw error;
+      }
+      console.error('Error updating user:', error.message, error.stack);
+      throw new InternalServerErrorException('Failed to update user');
+    }
+  }
 
   // #########################################################
   // DELETE OPTIONS - AFTER UPDATE OPTIONS - ALWAYS AT END
   // #########################################################
 
-  async deleteUser(id: string, currentUser: User): Promise<void> {
-    // Step 1: Find the user to delete
-    const user = await this.userRepository.findOne({
-      where: { id },
-    });
+  async delete(id: string): Promise<void> {
+    try {
+      const user = await this.userRepository.findOne({
+        where: { id },
+        relations: ['profile', 'privacy', 'security'],
+      });
 
-    if (!user) {
-      throw new NotFoundException(`User with id ${id} not found`);
+      if (!user) {
+        throw new NotFoundException(`User with id ${id} not found`);
+      }
+
+      // Hard delete - permanently removes user and related entities (CASCADE)
+      await this.userRepository.remove(user);
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      console.error('Error deleting user:', error.message, error.stack);
+      throw new InternalServerErrorException('Failed to delete user');
     }
-
-    // Step 2: Allow self or admin
-    if (currentUser.role !== ROLE.Administrator && currentUser.id !== id) {
-      throw new ForbiddenException(
-        'You do not have permission to delete this user',
-      );
-    }
-
-    // Step 3: Hard delete (permanent)
-    await this.userRepository.remove(user);
   }
 }

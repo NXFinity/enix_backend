@@ -4,15 +4,15 @@ import { User } from './user.entity';
 
 @Entity('userProfile', { schema: 'account' })
 export class Profile extends BaseEntity {
-  @Column({ unique: true, length: 50, nullable: true })
+  @Column({ length: 50, nullable: true })
   firstName: string;
-  @Column({ unique: true, length: 50, nullable: true })
+  @Column({ length: 50, nullable: true })
   lastName: string;
-  @Column({ unique: true, length: 500, nullable: true })
+  @Column({ length: 500, nullable: true })
   bio: string;
-  @Column({ unique: true, length: 50, nullable: true })
+  @Column({ length: 50, nullable: true })
   location: string;
-  @Column({ unique: true, length: 50, nullable: true })
+  @Column({ length: 50, nullable: true })
   website: string;
   @Column({ type: 'date', nullable: true })
   dateOfBirth: Date;

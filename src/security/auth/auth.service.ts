@@ -1,50 +1,484 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+
+// Authentication Services
+import { UsersService } from '../../rest/api/users/users.service';
+
+// Encryption
+import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 
 // Security DTO's
 import { RegisterDto } from './dto/register.dto';
-import { UsersService } from '../../rest/api/users/users.service';
-import { JwtService } from '@nestjs/jwt';
 import { LoginDto } from './dto/login.dto';
 import { VerifyDto } from './dto/verify.dto';
+import { ResendVerifyDto } from './dto/resend-verify.dto';
+import { ChangeDto } from './dto/change.dto';
+import { ForgotDto } from './dto/forgot.dto';
+import { ResetDto } from './dto/reset.dto';
+import { EmailService } from '@email/email';
+
+// Enum
+import { ROLE } from '../roles/assets/enum/role.enum';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
+    private readonly emailService: EmailService,
   ) {}
 
   // #########################################################
   // VALIDATE USER - ALWAYS AT THE TOP
   // #########################################################
 
-  async validateUser(email: string, password: string) {}
-
+  async validateUser(email: string, password: string): Promise<any> {
+    const user = await this.usersService.findByEmail(email);
+    if (user && (await bcrypt.compare(password, user.password))) {
+      const { password, ...result } = user;
+      return result;
+    }
+  }
   // #########################################################
   // USER REGISTRATION & VERIFY EMAIL
   // #########################################################
 
-  async register(registerDto: RegisterDto) {}
+  async register(registerDto: RegisterDto) {
+    const { username, email, password } = registerDto;
 
-  async verifyEmail(verifyDto: VerifyDto) {}
+    // Check if user already exists
+    const existingEmail = await this.usersService.existsByEmail(email);
+    if (existingEmail) {
+      throw new HttpException(
+        'User with this email already exists',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
 
-  async resendVerifyEmail(email: string) {}
+    const existingUsername = await this.usersService.existsByUsername(username);
+    if (existingUsername) {
+      throw new HttpException(
+        'User with this username already exists',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Generate websocketId (UUID)
+    const websocketId = crypto.randomUUID();
+
+    // Hash password
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // Generate verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+
+    // Create user
+    const user = await this.usersService.create({
+      username,
+      displayName: username, // Use username as displayName initially
+      email,
+      password: hashedPassword,
+      websocketId,
+      role: ROLE.Member,
+    });
+
+    // Update Security entity with verification token
+    await this.usersService.updateSecurityVerification(
+      user.id,
+      verificationToken,
+    );
+
+    // Send verification email
+    try {
+      await this.emailService.sendVerificationEmail(
+        email,
+        username,
+        verificationToken,
+      );
+    } catch (error) {
+      // Log error but don't fail registration if email fails
+      console.error('Failed to send verification email:', error);
+    }
+
+    // Return user without password
+    const { password: _, ...userWithoutPassword } = user;
+    return {
+      message:
+        'Registration successful. Please check your email to verify your account.',
+      user: userWithoutPassword,
+    };
+  }
+
+  async verifyEmail(verifyDto: VerifyDto) {
+    const { token } = verifyDto;
+
+    // Find security entity with this verification token
+    const security =
+      await this.usersService.findSecurityByVerificationToken(token);
+
+    if (!security) {
+      throw new HttpException(
+        'Invalid or expired verification token',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Check if already verified
+    if (security.isVerified) {
+      throw new HttpException(
+        'Email has already been verified',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Verify the email
+    await this.usersService.updateSecurityVerificationStatus(
+      security,
+      true,
+      new Date(),
+    );
+
+    // Get user info for response
+    const user = await this.usersService.findOne(security.user.id);
+    const { password: _, ...userWithoutPassword } = user;
+
+    return {
+      message: 'Email successfully verified',
+      user: userWithoutPassword,
+    };
+  }
+
+  async resendVerifyEmail(resendVerifyDto: ResendVerifyDto) {
+    const { email } = resendVerifyDto;
+
+    // Find user by email
+    const user = await this.usersService.existsByEmail(email);
+    if (!user) {
+      throw new HttpException(
+        'User with this email does not exist',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    // Find security entity for this user
+    const security = await this.usersService.findSecurityByUserEmail(email);
+    if (!security) {
+      throw new HttpException(
+        'Security record not found for this user',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    // Check if already verified
+    if (security.isVerified) {
+      throw new HttpException(
+        'Email has already been verified',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Generate new verification token (tokens expire after 15 minutes)
+    const newVerificationToken = crypto.randomBytes(32).toString('hex');
+
+    // Update Security entity with new verification token
+    await this.usersService.updateSecurityVerification(
+      user.id,
+      newVerificationToken,
+    );
+
+    // Send verification email with new token
+    try {
+      await this.emailService.sendVerificationEmail(
+        email,
+        user.username,
+        newVerificationToken,
+      );
+    } catch (error) {
+      console.error('Failed to send verification email:', error);
+      throw new HttpException(
+        'Failed to send verification email. Please try again later.',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    return {
+      message: 'Verification email has been resent. Please check your email.',
+    };
+  }
 
   // #########################################################
   // USER LOGIN & LOGOUT
   // #########################################################
 
-  async login(loginDto: LoginDto) {}
+  async login(loginDto: LoginDto, request: any) {
+    const { email, password } = loginDto;
 
-  async logout() {}
+    // Find user with security relation
+    const user = await this.usersService.findUserWithSecurityByEmail(email);
+    if (!user) {
+      throw new HttpException(
+        'Invalid email or password',
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      throw new HttpException(
+        'Invalid email or password',
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+
+    // Check if email is verified
+    if (!user.security || !user.security.isVerified) {
+      throw new HttpException(
+        'Please verify your email before logging in',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    // Check if user is banned
+    if (user.security.isBanned) {
+      throw new HttpException(
+        'Your account has been banned',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    // Check if user is timed out
+    if (user.security.isTimedOut) {
+      const timeoutUntil = user.security.timedOutUntil;
+      if (timeoutUntil && timeoutUntil > new Date()) {
+        throw new HttpException(
+          'Your account is temporarily timed out',
+          HttpStatus.FORBIDDEN,
+        );
+      }
+    }
+
+    // Store user in session (without password)
+    const { password: _, security, ...userWithoutPassword } = user;
+    (request.session as any).user = {
+      id: user.id,
+      email: user.email,
+      username: user.username,
+      displayName: user.displayName,
+      role: user.role,
+      websocketId: user.websocketId,
+      isVerified: user.security.isVerified,
+    };
+
+    // Save session - await to ensure session is saved before returning
+    await new Promise<void>((resolve, reject) => {
+      request.session.save((err: any) => {
+        if (err) {
+          console.error('Session save error:', err);
+          reject(
+            new HttpException(
+              'Failed to save session',
+              HttpStatus.INTERNAL_SERVER_ERROR,
+            ),
+          );
+        } else {
+          resolve();
+        }
+      });
+    });
+
+    return {
+      message: 'Login successful',
+      user: userWithoutPassword,
+    };
+  }
+
+  async logout(request: any) {
+    return new Promise<void>((resolve, reject) => {
+      request.session.destroy((err: any) => {
+        if (err) {
+          console.error('Session destroy error:', err);
+          reject(
+            new HttpException(
+              'Failed to logout',
+              HttpStatus.INTERNAL_SERVER_ERROR,
+            ),
+          );
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
 
   // #########################################################
   // USER CHANGE, FORGOT & RESET PASSWORD
   // #########################################################
 
-  async changePassword(password: string) {}
+  async changePassword(changeDto: ChangeDto, request: any) {
+    const { currentPassword, newPassword } = changeDto;
+    const userId = (request.user as any)?.id || (request.session as any)?.user?.id;
 
-  async forgotPassword(email: string) {}
+    if (!userId) {
+      throw new HttpException(
+        'User not found in session',
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
 
-  async resetPassword(email: string) {}
+    // Get user with password
+    const user = await this.usersService.findOne(userId);
+
+    // Verify current password
+    const isPasswordValid = await bcrypt.compare(
+      currentPassword,
+      user.password,
+    );
+    if (!isPasswordValid) {
+      throw new HttpException(
+        'Current password is incorrect',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Check if new password is different from current password
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+    if (isSamePassword) {
+      throw new HttpException(
+        'New password must be different from current password',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Hash new password
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+    // Update password
+    await this.usersService.updateUserPassword(userId, hashedPassword);
+
+    // Send password changed notification email
+    try {
+      await this.emailService.sendPasswordChangedEmail(
+        user.email,
+        user.username,
+      );
+    } catch (error) {
+      console.error('Failed to send password changed email:', error);
+      // Don't fail the operation if email fails
+    }
+
+    return {
+      message: 'Password changed successfully',
+    };
+  }
+
+  async forgotPassword(forgotDto: ForgotDto) {
+    const { email } = forgotDto;
+
+    // Find user by email
+    const user = await this.usersService.existsByEmail(email);
+    if (!user) {
+      // Don't reveal if user exists or not for security
+      return {
+        message:
+          'If an account with that email exists, a password reset link has been sent.',
+      };
+    }
+
+    // Find security entity
+    const security = await this.usersService.findSecurityByUserEmail(email);
+    if (!security) {
+      return {
+        message:
+          'If an account with that email exists, a password reset link has been sent.',
+      };
+    }
+
+    // Generate password reset token (expires in 1 hour)
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 1);
+
+    // Update Security entity with reset token
+    await this.usersService.updatePasswordResetToken(
+      user.id,
+      resetToken,
+      expiresAt,
+    );
+
+    // Send forgot password email
+    try {
+      await this.emailService.sendForgotPasswordEmail(
+        email,
+        user.username,
+        resetToken,
+      );
+    } catch (error) {
+      console.error('Failed to send forgot password email:', error);
+      // Don't reveal if email failed
+    }
+
+    return {
+      message:
+        'If an account with that email exists, a password reset link has been sent.',
+    };
+  }
+
+  async resetPassword(resetDto: ResetDto) {
+    const { token, newPassword } = resetDto;
+
+    // Find security entity with this reset token
+    const security =
+      await this.usersService.findSecurityByPasswordResetToken(token);
+
+    if (!security) {
+      throw new HttpException(
+        'Invalid or expired password reset token',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Check if token has expired
+    if (
+      !security.passwordResetTokenExpires ||
+      security.passwordResetTokenExpires < new Date()
+    ) {
+      throw new HttpException(
+        'Password reset token has expired',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Hash new password
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+    // Update password
+    await this.usersService.updateUserPassword(
+      security.user.id,
+      hashedPassword,
+    );
+
+    // Clear reset token
+    await this.usersService.clearPasswordResetToken(security.user.id);
+
+    // Send password reset confirmation email
+    try {
+      await this.emailService.sendPasswordResetEmail(
+        security.user.email,
+        security.user.username,
+        token,
+      );
+    } catch (error) {
+      console.error('Failed to send password reset confirmation email:', error);
+      // Don't fail the operation if email fails
+    }
+
+    return {
+      message: 'Password has been reset successfully',
+    };
+  }
 }

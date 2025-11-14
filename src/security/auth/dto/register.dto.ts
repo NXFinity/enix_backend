@@ -3,51 +3,33 @@ import {
   IsEmail,
   IsNotEmpty,
   IsString,
-  Length,
+  MinLength,
+  MaxLength,
   Matches,
 } from 'class-validator';
-import { Exclude } from 'class-transformer';
+import { SanitizeUsername } from '../../../utils/sanitize-dto.util';
 
 export class RegisterDto {
-  @ApiProperty({
-    description: 'Username for the account',
-    example: 'johndoe',
-    minLength: 3,
-    maxLength: 30,
-  })
-  @IsNotEmpty({ message: 'Username is required' })
+  @ApiProperty({ example: 'johndoe' })
+  @IsNotEmpty()
   @IsString()
-  @Length(3, 30, { message: 'Username must be between 3 and 30 characters' })
+  @MinLength(3)
+  @MaxLength(50)
   @Matches(/^[a-zA-Z0-9_-]+$/, {
-    message:
-      'Username can only contain letters, numbers, underscores, and hyphens',
+    message: 'Username can only contain letters, numbers, underscores, and hyphens',
   })
+  @SanitizeUsername()
   username: string;
 
-  @ApiProperty({
-    description: 'Email address',
-    example: 'user@metaenix.com',
-    format: 'email',
-  })
-  @IsNotEmpty({ message: 'Email is required' })
-  @IsEmail({}, { message: 'Invalid email format' })
-  @Length(1, 255, { message: 'Email is too long' })
+  @ApiProperty({ example: 'john.doe@example.com' })
+  @IsNotEmpty()
+  @IsEmail()
   email: string;
 
-  @ApiProperty({
-    description:
-      'Password (min 8 characters, must contain uppercase, lowercase, and number)',
-    example: 'SecurePass123!',
-    minLength: 8,
-    format: 'password',
-  })
-  @IsNotEmpty({ message: 'Password is required' })
+  @ApiProperty({ example: 'SecurePassword123!' })
+  @IsNotEmpty()
   @IsString()
-  @Exclude()
-  @Length(8, 255, { message: 'Password must be at least 8 characters' })
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, {
-    message:
-      'Password must contain at least one uppercase letter, one lowercase letter, and one number',
-  })
+  @MinLength(8)
+  @MaxLength(100)
   password: string;
 }

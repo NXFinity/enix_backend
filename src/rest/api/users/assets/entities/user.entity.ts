@@ -9,7 +9,7 @@ import { Security } from './security/security.entity';
 export class User extends BaseEntity {
   // #########################################################
   // WebSocketID - Created as part of user registration
-  @Column({ type: 'string', unique: true, nullable: false })
+  @Column()
   websocketId: string;
   // #########################################################
 

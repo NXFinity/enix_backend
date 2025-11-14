@@ -59,6 +59,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
     "compression": "^1.8.1",
+    "connect-redis": "^7.1.1",
     "cookie-parser": "^1.4.7",
     "csrf-csrf": "^4.0.3",
     "discord.js": "^14.22.1",
@@ -93,6 +94,7 @@
     "webpack": "^5.101.3",
     "webpack-node-externals": "^3.0.0",
     "webtorrent": "^2.8.4",
+    "winston": "^3.18.3",
     "ws": "^8.18.3"
   },
   "devDependencies": {
@@ -117,6 +119,7 @@
     "@types/passport-jwt": "^4.0.1",
     "@types/passport-local": "^1.0.38",
     "@types/supertest": "^6.0.2",
+    "@types/winston": "^2.4.4",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.2.2",
@@ -156,7 +159,9 @@
       "^@database/database(|/.*)$": "<rootDir>/libs/database/src/$1",
       "^@email/email(|/.*)$": "<rootDir>/libs/email/src/$1",
       "^@kafka/kafka(|/.*)$": "<rootDir>/libs/kafka/src/$1",
-      "^@redis/redis(|/.*)$": "<rootDir>/libs/redis/src/$1"
+      "^@logging/logging(|/.*)$": "<rootDir>/libs/logging/src/$1",
+      "^@redis/redis(|/.*)$": "<rootDir>/libs/redis/src/$1",
+      "^@throttle/throttle(|/.*)$": "<rootDir>/libs/throttle/src/$1"
     }
   }
 }
