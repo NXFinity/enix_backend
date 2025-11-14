@@ -21,9 +21,13 @@ export class RefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
         },
       ]),
       ignoreExpiration: false,
-      secretOrKey:
-        configService.get<string>('JWT_REFRESH_SECRET') ||
-        'default-refresh-secret',
+      secretOrKey: (() => {
+        const refreshSecret = configService.get<string>('REFRESH_TOKEN_SECRET');
+        if (!refreshSecret) {
+          throw new Error('REFRESH_TOKEN_SECRET environment variable is required');
+        }
+        return refreshSecret;
+      })(),
       passReqToCallback: true, // Pass request to validate method
     });
   }

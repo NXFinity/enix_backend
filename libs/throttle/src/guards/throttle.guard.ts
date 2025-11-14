@@ -21,9 +21,18 @@ export class ThrottleGuard implements CanActivate {
     private readonly reflector: Reflector,
     private readonly configService: ConfigService,
   ) {
-    // Default rate limits: 100 requests per minute
-    this.defaultLimit = this.configService.get<number>('THROTTLE_DEFAULT_LIMIT') || 100;
-    this.defaultTtl = this.configService.get<number>('THROTTLE_DEFAULT_TTL') || 60;
+    const limit = this.configService.get<number>('THROTTLE_DEFAULT_LIMIT');
+    const ttl = this.configService.get<number>('THROTTLE_DEFAULT_TTL');
+    
+    if (limit === undefined) {
+      throw new Error('THROTTLE_DEFAULT_LIMIT environment variable is required');
+    }
+    if (ttl === undefined) {
+      throw new Error('THROTTLE_DEFAULT_TTL environment variable is required');
+    }
+    
+    this.defaultLimit = limit;
+    this.defaultTtl = ttl;
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {

@@ -54,9 +54,11 @@ export class WebsocketGateway
     private readonly sessionStoreConfig: SessionStoreConfig,
     private readonly configService: ConfigService,
   ) {
-    this.sessionSecret =
-      this.configService.get<string>('SESSION_SECRET') ||
-      'default-session-secret-change-in-production';
+    const sessionSecret = this.configService.get<string>('SESSION_SECRET');
+    if (!sessionSecret) {
+      throw new Error('SESSION_SECRET environment variable is required');
+    }
+    this.sessionSecret = sessionSecret;
   }
 
   async onModuleInit() {

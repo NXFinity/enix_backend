@@ -68,9 +68,13 @@ async function bootstrap() {
   app.use(
     session({
       store: sessionStore,
-      secret:
-        configService.get<string>('SESSION_SECRET') ||
-        'default-session-secret-change-in-production',
+      secret: (() => {
+        const secret = configService.get<string>('SESSION_SECRET');
+        if (!secret) {
+          throw new Error('SESSION_SECRET environment variable is required');
+        }
+        return secret;
+      })(),
       resave: false,
       saveUninitialized: false,
       cookie: {

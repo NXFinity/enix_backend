@@ -30,10 +30,20 @@ export class SessionStoreConfig implements OnModuleInit {
     
     // connect-redis v7 exports RedisStore as a class directly
     // This version supports ioredis clients
+    const sessionPrefix = this.configService.get<string>('REDIS_SESSION_PREFIX');
+    const sessionTtl = this.configService.get<number>('SESSION_TTL');
+    
+    if (!sessionPrefix) {
+      throw new Error('REDIS_SESSION_PREFIX environment variable is required');
+    }
+    if (sessionTtl === undefined) {
+      throw new Error('SESSION_TTL environment variable is required');
+    }
+    
     this.store = new RedisStore({
       client: redisClient,
-      prefix: this.configService.get<string>('REDIS_SESSION_PREFIX') || 'sess:',
-      ttl: this.configService.get<number>('SESSION_TTL') || 86400, // 24 hours in seconds
+      prefix: sessionPrefix,
+      ttl: sessionTtl,
     });
   }
 

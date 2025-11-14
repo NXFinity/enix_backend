@@ -9,15 +9,16 @@ import { RolesModule } from './security/roles';
 import { UsersModule } from './rest/api/users/users.module';
 import { WebsocketModule } from './rest/websocket/websocket.module';
 import { SessionStoreConfig } from './config/session-store.config';
+import { HealthModule } from './services/health/health.module';
+import { StartupModule } from './services/startup/startup.module';
+import { StorageModule } from './rest/storage/storage.module';
 
 // Validation
 import * as Joi from 'joi';
 // Guards
 import { AuthGuard } from './security/auth/guards/auth.guard';
 import { ThrottleGuard } from '@throttle/throttle';
-import { HealthModule } from './services/health/health.module';
-import { StartupModule } from './services/startup/startup.module';
-import { StorageModule } from './rest/storage/storage.module';
+
 
 // Configuration Variables
 
@@ -37,7 +38,6 @@ import { StorageModule } from './rest/storage/storage.module';
           .default('development'),
         NODE_HOST: Joi.string().required(),
         NODE_PORT: Joi.number().required().min(1).max(65535),
-
         // ============================================
         // DATABASE VALIDATION
         // ============================================
@@ -47,7 +47,6 @@ import { StorageModule } from './rest/storage/storage.module';
         POSTGRES_PASSWORD: Joi.string().required().min(1),
         POSTGRES_DB: Joi.string().required().min(1),
         POSTGRES_DB_DEV: Joi.string().required().min(1),
-
         // ============================================
         // JWT VALIDATION
         // ============================================
@@ -74,7 +73,6 @@ import { StorageModule } from './rest/storage/storage.module';
             'string.pattern.base':
               'REFRESH_TOKEN_EXPIRES_IN must be in format: number + unit (s/m/h/d), e.g., "7d", "30d"',
           }),
-
         // ============================================
         // SMTP VALIDATION
         // ============================================
@@ -84,7 +82,6 @@ import { StorageModule } from './rest/storage/storage.module';
         SMTP_PASSWORD: Joi.string().required().min(1),
         SMTP_SECURE: Joi.boolean().default(false),
         SMTP_TLS: Joi.boolean().default(false),
-
         // ============================================
         // REDIS VALIDATION
         // ============================================
@@ -92,36 +89,32 @@ import { StorageModule } from './rest/storage/storage.module';
         REDIS_PORT: Joi.number().required().min(1).max(65535),
         REDIS_PASSWORD: Joi.string().required().min(1),
         REDIS_DB: Joi.number().required().min(0).max(15),
-        REDIS_KEY_PREFIX: Joi.string().default('metaenix'),
-        REDIS_ENABLE_READY_CHECK: Joi.boolean().default(true),
-        REDIS_MAX_RETRIES: Joi.number().default(3).min(1).max(10),
-
+        REDIS_KEY_PREFIX: Joi.string().required().min(1),
+        REDIS_ENABLE_READY_CHECK: Joi.boolean().required(),
+        REDIS_MAX_RETRIES: Joi.number().required().min(1).max(10),
         // ============================================
         // SESSION VALIDATION
         // ============================================
         SESSION_SECRET: Joi.string().required().min(32),
-        REDIS_SESSION_PREFIX: Joi.string().default('sess:'),
+        REDIS_SESSION_PREFIX: Joi.string().required().min(1),
         SESSION_TTL: Joi.number().required().min(60).max(31536000), // 1 minute to 1 year
-
         // ============================================
         // THROTTLE VALIDATION
         // ============================================
-        THROTTLE_DEFAULT_LIMIT: Joi.number().default(100).min(1).max(10000),
-        THROTTLE_DEFAULT_TTL: Joi.number().default(60).min(1).max(3600), // 1 second to 1 hour
-
+        THROTTLE_DEFAULT_LIMIT: Joi.number().required().min(1).max(10000),
+        THROTTLE_DEFAULT_TTL: Joi.number().required().min(1).max(3600), // 1 second to 1 hour
         // ============================================
         // URL VALIDATION
         // ============================================
         FRONTEND_URL: Joi.string().uri().allow('').default(''),
         BACKEND_URL: Joi.string().uri().allow('').default(''),
-
+        CORS_ORIGINS: Joi.string().allow('').default(''), // Comma-separated list of allowed origins
         // ============================================
         // SYSTEM ACCOUNT VALIDATION
         // ============================================
         SYSTEM_USERNAME: Joi.string().required().min(3).max(50),
         SYSTEM_EMAIL: Joi.string().required().email(),
         SYSTEM_PASSWORD: Joi.string().required().min(8),
-
         // ============================================
         // DIGITALOCEAN SPACES VALIDATION
         // ============================================
@@ -130,12 +123,13 @@ import { StorageModule } from './rest/storage/storage.module';
         DO_SPACES_SECRET: Joi.string().required().min(1),
         DO_SPACES_BUCKET: Joi.string().required().min(1),
         DO_SPACES_BUCKET_ENDPOINT: Joi.string().uri().required(),
-
         // ============================================
         // KAFKA VALIDATION (Optional)
         // ============================================
         KAFKA_BROKERS: Joi.string().allow('').default(''),
-        KAFKA_CLIENT_ID: Joi.string().allow('').default('metaenix-kafka-client'),
+        KAFKA_CLIENT_ID: Joi.string()
+          .allow('')
+          .default('metaenix-kafka-client'),
         KAFKA_LOG_LEVEL: Joi.string()
           .valid('ERROR', 'WARN', 'INFO', 'DEBUG')
           .default('WARN'),

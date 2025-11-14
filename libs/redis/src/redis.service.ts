@@ -18,7 +18,10 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   public readonly keyBuilder: KeyBuilder;
 
   constructor(private configService: ConfigService) {
-    const keyPrefix = this.configService.get<string>('REDIS_KEY_PREFIX') || 'metaenix';
+    const keyPrefix = this.configService.get<string>('REDIS_KEY_PREFIX');
+    if (!keyPrefix) {
+      throw new Error('REDIS_KEY_PREFIX environment variable is required');
+    }
     this.keyBuilder = new KeyBuilder(keyPrefix);
   }
 
@@ -39,14 +42,32 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    */
   private async connect(): Promise<void> {
     try {
-      const host = this.configService.get<string>('REDIS_HOST') || 'localhost';
-      const port = this.configService.get<number>('REDIS_PORT') || 6379;
+      const host = this.configService.get<string>('REDIS_HOST');
+      const port = this.configService.get<number>('REDIS_PORT');
       const password = this.configService.get<string>('REDIS_PASSWORD');
-      const db = this.configService.get<number>('REDIS_DB') || 0;
-      const enableReadyCheck =
-        this.configService.get<boolean>('REDIS_ENABLE_READY_CHECK') ?? true;
-      const maxRetriesPerRequest =
-        this.configService.get<number>('REDIS_MAX_RETRIES') || 3;
+      const db = this.configService.get<number>('REDIS_DB');
+      
+      if (!host) {
+        throw new Error('REDIS_HOST environment variable is required');
+      }
+      if (port === undefined) {
+        throw new Error('REDIS_PORT environment variable is required');
+      }
+      if (!password) {
+        throw new Error('REDIS_PASSWORD environment variable is required');
+      }
+      if (db === undefined) {
+        throw new Error('REDIS_DB environment variable is required');
+      }
+      
+      const enableReadyCheck = this.configService.get<boolean>('REDIS_ENABLE_READY_CHECK');
+      if (enableReadyCheck === undefined) {
+        throw new Error('REDIS_ENABLE_READY_CHECK environment variable is required');
+      }
+      const maxRetriesPerRequest = this.configService.get<number>('REDIS_MAX_RETRIES');
+      if (maxRetriesPerRequest === undefined) {
+        throw new Error('REDIS_MAX_RETRIES environment variable is required');
+      }
       const retryStrategy = (times: number) => {
         const delay = Math.min(times * 50, 2000);
         return delay;

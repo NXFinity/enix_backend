@@ -44,9 +44,12 @@ export class StorageService {
     this.bucket = spacesBucket;
     this.endpoint = spacesEndpoint;
 
+    // DO_SPACES_REGION is optional, defaults to 'us-east-1' if not provided
+    const spacesRegion = this.configService.get<string>('DO_SPACES_REGION') || 'us-east-1';
+
     this.s3Client = new S3Client({
       endpoint: spacesEndpoint,
-      region: 'us-east-1', // DO Spaces uses us-east-1 as default
+      region: spacesRegion,
       credentials: {
         accessKeyId: spacesKey,
         secretAccessKey: spacesSecret,
