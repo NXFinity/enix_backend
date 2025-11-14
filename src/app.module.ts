@@ -17,6 +17,7 @@ import { AuthGuard } from './security/auth/guards/auth.guard';
 import { ThrottleGuard } from '@throttle/throttle';
 import { HealthModule } from './services/health/health.module';
 import { StartupModule } from './services/startup/startup.module';
+import { StorageModule } from './rest/storage/storage.module';
 
 // Configuration Variables
 
@@ -122,13 +123,13 @@ import { StartupModule } from './services/startup/startup.module';
         SYSTEM_PASSWORD: Joi.string().required().min(8),
 
         // ============================================
-        // DIGITALOCEAN SPACES VALIDATION (Optional)
+        // DIGITALOCEAN SPACES VALIDATION
         // ============================================
         DO_API_SECRET: Joi.string().allow('').default(''),
-        DO_SPACES_KEY: Joi.string().allow('').default(''),
-        DO_SPACES_SECRET: Joi.string().allow('').default(''),
-        DO_SPACES_BUCKET: Joi.string().allow('').default(''),
-        DO_SPACES_BUCKET_ENDPOINT: Joi.string().uri().allow('').default(''),
+        DO_SPACES_KEY: Joi.string().required().min(1),
+        DO_SPACES_SECRET: Joi.string().required().min(1),
+        DO_SPACES_BUCKET: Joi.string().required().min(1),
+        DO_SPACES_BUCKET_ENDPOINT: Joi.string().uri().required(),
 
         // ============================================
         // KAFKA VALIDATION (Optional)
@@ -167,6 +168,7 @@ import { StartupModule } from './services/startup/startup.module';
     WebsocketModule,
     HealthModule,
     StartupModule,
+    StorageModule,
   ],
   controllers: [],
   providers: [

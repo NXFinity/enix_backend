@@ -8,6 +8,7 @@ export enum LogCategory {
   DATABASE = 'database',
   EMAIL = 'email',
   CACHE = 'cache',
+  STORAGE = 'storage',
   OTHER = 'other',
 }
 

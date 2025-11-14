@@ -58,6 +58,15 @@ Meta EN|IX Backend is a production-ready NestJS application providing comprehens
 - WebSocket ID tracking for client identification
 - User search and filtering
 
+### File Storage
+- Digital Ocean Spaces integration (S3-compatible)
+- User-based file organization (`userId/storageType/subType/filename.ext`)
+- Multiple storage types: profile, media, documents, temp, backups
+- Profile image support: avatar, cover, offline, chat
+- File validation: MIME type and size checks per storage type
+- Public file URLs and presigned URLs for private access
+- Secure file deletion with user authorization
+
 ### Security
 - Global rate limiting (100 req/min default)
 - Input sanitization (XSS protection)
@@ -74,6 +83,7 @@ Meta EN|IX Backend is a production-ready NestJS application providing comprehens
 - Comprehensive logging (Winston + database audit logs)
 - Caching service (Redis-based)
 - Email service (Nodemailer)
+- File storage service (Digital Ocean Spaces)
 - Database transactions for multi-entity operations
 - Environment variable validation (Joi)
 
@@ -106,6 +116,8 @@ Meta EN|IX Backend is a production-ready NestJS application providing comprehens
 - **Socket.IO** - WebSocket support
 - **Winston** - Structured logging
 - **Nodemailer** - Email service
+- **AWS SDK** - Digital Ocean Spaces integration (S3-compatible)
+- **Multer** - File upload handling
 - **BullMQ** - Job queue management
 - **KafkaJS** - Message broker support
 
@@ -164,9 +176,10 @@ backend/
 2. **AuthModule** - Authentication and session management
 3. **RolesModule** - Role and permission management (CASL)
 4. **WebsocketModule** - WebSocket gateway for real-time communication
-5. **HealthModule** - Health check endpoints
-6. **CachingModule** - Redis-based caching service
-7. **LoggingModule** - Structured logging and audit logs
+5. **StorageModule** - File storage with Digital Ocean Spaces
+6. **HealthModule** - Health check endpoints
+7. **CachingModule** - Redis-based caching service
+8. **LoggingModule** - Structured logging and audit logs
 
 ---
 
@@ -177,6 +190,7 @@ backend/
 - Node.js v18+ 
 - PostgreSQL 12+
 - Redis 6+
+- Digital Ocean Spaces account (or S3-compatible storage)
 - npm or yarn
 
 ### Installation
@@ -209,7 +223,13 @@ cp .env.example .env
 # Ensure Redis is running on configured host/port
 ```
 
-6. **Start the development server**
+6. **Configure Digital Ocean Spaces**
+```bash
+# Set up Digital Ocean Spaces credentials in .env
+# Required: DO_SPACES_KEY, DO_SPACES_SECRET, DO_SPACES_BUCKET, DO_SPACES_BUCKET_ENDPOINT
+```
+
+7. **Start the development server**
 ```bash
 npm run start:dev
 ```
@@ -265,6 +285,13 @@ The application requires comprehensive environment variable configuration. All v
 - `THROTTLE_DEFAULT_LIMIT` - Default rate limit (default: 100)
 - `THROTTLE_DEFAULT_TTL` - Default TTL in seconds (default: 60)
 
+#### Digital Ocean Spaces (File Storage)
+- `DO_SPACES_KEY` - Digital Ocean Spaces access key ID
+- `DO_SPACES_SECRET` - Digital Ocean Spaces secret access key
+- `DO_SPACES_BUCKET` - Bucket name for file storage
+- `DO_SPACES_BUCKET_ENDPOINT` - Spaces endpoint URL (e.g., `https://lon1.digitaloceanspaces.com`)
+- `DO_API_SECRET` - Digital Ocean API secret (optional)
+
 See `src/app.module.ts` for complete validation schema.
 
 ---
@@ -304,6 +331,14 @@ Access Swagger UI at `/v1` endpoint (development only).
 - `GET /roles` - Get all roles (admin only)
 - `GET /roles/permissions` - Get all permissions
 - `GET /roles/permissions/:role` - Get permissions for role
+
+#### Storage (`/v1/storage`)
+- `POST /storage/upload` - Upload file to Digital Ocean Spaces
+  - Supports: profile images (avatar, cover, offline, chat), media files, documents, temporary files, backups
+  - File organization: `userId/storageType/subType/filename.ext`
+  - File validation: MIME type and size checks per storage type
+- `DELETE /storage/:fileKey` - Delete file from storage
+- `POST /storage/presigned-url` - Get presigned URL for temporary file access
 
 #### Health (`/v1/health`)
 - `GET /health` - Comprehensive health check
@@ -440,6 +475,7 @@ npm run test:e2e       # Run E2E tests
 - [ ] Configure all required environment variables
 - [ ] Set up Redis connection
 - [ ] Configure SMTP settings
+- [ ] Configure Digital Ocean Spaces credentials
 - [ ] Set secure session secret
 - [ ] Configure CORS origins
 - [ ] Set up health check monitoring
