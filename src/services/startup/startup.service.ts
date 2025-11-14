@@ -1,10 +1,14 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import { CachingService } from '@caching/caching';
 import { UsersService } from '../../rest/api/users/users.service';
 import { LoggingService } from '@logging/logging';
 import { LogCategory } from '@logging/logging';
 import { ROLE } from '../../security/roles/assets/enum/role.enum';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, LessThanOrEqual } from 'typeorm';
+import { Post } from '../../rest/api/users/services/posts/assets/entities/post.entity';
 
 @Injectable()
 export class StartupService implements OnModuleInit {
@@ -15,6 +19,8 @@ export class StartupService implements OnModuleInit {
     private readonly usersService: UsersService,
     private readonly configService: ConfigService,
     private readonly loggingService: LoggingService,
+    @InjectRepository(Post)
+    private readonly postRepository: Repository<Post>,
   ) {}
 
   async onModuleInit() {
@@ -150,6 +156,57 @@ export class StartupService implements OnModuleInit {
     } catch (error) {
       this.logger.warn(
         `Could not warm admin users cache: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
+  }
+
+  /**
+   * Publish scheduled posts (runs every minute)
+   */
+  @Cron(CronExpression.EVERY_MINUTE)
+  async publishScheduledPosts(): Promise<void> {
+    try {
+      const now = new Date();
+      const scheduledPosts = await this.postRepository.find({
+        where: {
+          isDraft: true,
+          scheduledDate: LessThanOrEqual(now),
+        },
+      });
+
+      if (scheduledPosts.length === 0) {
+        return;
+      }
+
+      for (const post of scheduledPosts) {
+        post.isDraft = false;
+        post.scheduledDate = null;
+        await this.postRepository.save(post);
+
+        // Invalidate cache
+        await this.cachingService.invalidateByTags(
+          'post',
+          `post:${post.id}`,
+          `user:${post.userId}:posts`,
+        );
+
+        this.loggingService.log('Scheduled post published', 'StartupService', {
+          category: LogCategory.USER_MANAGEMENT,
+          userId: post.userId,
+          metadata: { postId: post.id },
+        });
+      }
+
+      this.logger.log(`Published ${scheduledPosts.length} scheduled post(s)`);
+    } catch (error) {
+      this.loggingService.error(
+        'Error publishing scheduled posts',
+        error instanceof Error ? error.stack : undefined,
+        'StartupService',
+        {
+          category: LogCategory.DATABASE,
+          error: error instanceof Error ? error : new Error(String(error)),
+        },
       );
     }
   }

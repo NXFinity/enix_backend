@@ -56,7 +56,7 @@ export const STORAGE_TYPE_METADATA: Record<
       'audio/ogg',
     ],
     maxFileSize: 100 * 1024 * 1024, // 100MB
-    subTypes: ['photo', 'video', 'audio'],
+    subTypes: ['photo', 'video', 'audio', 'post'],
   },
   [StorageType.DOCUMENTS]: {
     type: 'documents',

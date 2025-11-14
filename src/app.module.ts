@@ -19,7 +19,6 @@ import * as Joi from 'joi';
 import { AuthGuard } from './security/auth/guards/auth.guard';
 import { ThrottleGuard } from '@throttle/throttle';
 
-
 // Configuration Variables
 
 @Module({

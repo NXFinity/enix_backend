@@ -8,10 +8,12 @@ import { User } from './assets/entities/user.entity';
 import { Privacy } from './assets/entities/security/privacy.entity';
 import { Security } from './assets/entities/security/security.entity';
 import { Profile } from './assets/entities/profile.entity';
+import { PostsModule } from './services/posts/posts.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, Profile, Privacy, Security]),
+    PostsModule,
   ],
   controllers: [UsersController],
   providers: [UsersService],

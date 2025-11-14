@@ -1,9 +1,13 @@
-import { Column, Entity, Index, OneToOne } from 'typeorm';
+import { Column, Entity, Index, OneToOne, OneToMany } from 'typeorm';
 import { BaseEntity } from '@database/database';
 import { ROLE } from 'src/security/roles/assets/enum/role.enum';
 import { Profile } from './profile.entity';
 import { Privacy } from './security/privacy.entity';
 import { Security } from './security/security.entity';
+import { Post } from '../../services/posts/assets/entities/post.entity';
+import { Comment } from '../../services/posts/assets/entities/comment.entity';
+import { Like } from '../../services/posts/assets/entities/like.entity';
+import { Share } from '../../services/posts/assets/entities/share.entity';
 
 @Entity('user', { schema: 'account' })
 @Index(['websocketId'])
@@ -47,4 +51,17 @@ export class User extends BaseEntity {
   })
   security: Security;
   // #########################################################
+
+  // User relationships
+  @OneToMany(() => Post, (post) => post.user, { onDelete: 'CASCADE' })
+  posts: Post[];
+
+  @OneToMany(() => Comment, (comment) => comment.user, { onDelete: 'CASCADE' })
+  comments: Comment[];
+
+  @OneToMany(() => Like, (like) => like.user, { onDelete: 'CASCADE' })
+  likes: Like[];
+
+  @OneToMany(() => Share, (share) => share.user, { onDelete: 'CASCADE' })
+  shares: Share[];
 }
