@@ -9,7 +9,6 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { UsersModule } from '../../rest/api/users/users.module';
 import { EmailModule } from '@email/email';
-import { ThrottleGuard } from '@throttle/throttle';
 
 // Strategies
 import { JwtStrategy } from './strategies/jwt.strategy';
@@ -37,10 +36,6 @@ import { JwtStrategy } from './strategies/jwt.strategy';
   providers: [
     AuthService,
     JwtStrategy,
-    {
-      provide: APP_GUARD,
-      useClass: ThrottleGuard,
-    },
   ],
   exports: [AuthService],
 })

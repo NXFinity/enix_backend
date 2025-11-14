@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto, UpdateUserDto } from './assets/dto/createUser.dto';
-import { Request } from 'express';
+import { AuthenticatedRequest } from '../../../common/interfaces/authenticated-request.interface';
 import {
   ApiOperation,
   ApiResponse,
@@ -164,9 +164,8 @@ export class UsersController {
       },
     },
   })
-  getMe(@Req() request: Request) {
-    const userId =
-      (request.user as any)?.id || (request.session as any)?.user?.id;
+  getMe(@Req() request: AuthenticatedRequest) {
+    const userId = request.user?.id || request.session?.user?.id;
     if (!userId) {
       throw new UnauthorizedException('User not found in session');
     }
@@ -355,9 +354,8 @@ export class UsersController {
       },
     },
   })
-  updateMe(@Req() request: Request, @Body() updateUserDto: UpdateUserDto) {
-    const userId =
-      (request.user as any)?.id || (request.session as any)?.user?.id;
+  updateMe(@Req() request: AuthenticatedRequest, @Body() updateUserDto: UpdateUserDto) {
+    const userId = request.user?.id || request.session?.user?.id;
     if (!userId) {
       throw new UnauthorizedException('User not found in session');
     }
@@ -496,9 +494,8 @@ export class UsersController {
       },
     },
   })
-  deleteMe(@Req() request: Request) {
-    const userId =
-      (request.user as any)?.id || (request.session as any)?.user?.id;
+  deleteMe(@Req() request: AuthenticatedRequest) {
+    const userId = request.user?.id || request.session?.user?.id;
     if (!userId) {
       throw new UnauthorizedException('User not found in session');
     }

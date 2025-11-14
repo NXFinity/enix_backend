@@ -6,16 +6,25 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { ConfigService } from '@nestjs/config';
 import { ThrottleService } from '../throttle.service';
 import { ThrottleOptions } from '../interfaces/throttle-options.interface';
 import { THROTTLE_KEY, THROTTLE_SKIP_KEY } from '../decorators/throttle.decorator';
 
 @Injectable()
 export class ThrottleGuard implements CanActivate {
+  private readonly defaultLimit: number;
+  private readonly defaultTtl: number;
+
   constructor(
     private readonly throttleService: ThrottleService,
     private readonly reflector: Reflector,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    // Default rate limits: 100 requests per minute
+    this.defaultLimit = this.configService.get<number>('THROTTLE_DEFAULT_LIMIT') || 100;
+    this.defaultTtl = this.configService.get<number>('THROTTLE_DEFAULT_TTL') || 60;
+  }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     // Check if route should skip throttling
@@ -34,21 +43,20 @@ export class ThrottleGuard implements CanActivate {
       [context.getHandler(), context.getClass()],
     );
 
-    // If no throttle options, allow request (no rate limiting)
-    if (!throttleOptions) {
-      return true;
-    }
+    // Use decorator options if present, otherwise use default limits
+    const limit = throttleOptions?.limit || this.defaultLimit;
+    const ttl = throttleOptions?.ttl || this.defaultTtl;
 
     const request = context.switchToHttp().getRequest();
     const response = context.switchToHttp().getResponse();
 
     // Check skip condition if provided
-    if (throttleOptions.skipIf && throttleOptions.skipIf(request)) {
+    if (throttleOptions?.skipIf && throttleOptions.skipIf(request)) {
       return true;
     }
 
     // Get identifier (IP address or user ID)
-    const identifier = throttleOptions.getIdentifier
+    const identifier = throttleOptions?.getIdentifier
       ? throttleOptions.getIdentifier(request)
       : this.getDefaultIdentifier(request);
 
@@ -60,27 +68,27 @@ export class ThrottleGuard implements CanActivate {
       identifier,
       action,
       {
-        limit: throttleOptions.limit,
-        window: throttleOptions.ttl,
+        limit,
+        window: ttl,
       },
     );
 
     // Add rate limit headers to response
-    response.setHeader('X-RateLimit-Limit', throttleOptions.limit);
+    response.setHeader('X-RateLimit-Limit', limit);
     response.setHeader('X-RateLimit-Remaining', result.remaining);
     response.setHeader('X-RateLimit-Reset', new Date(result.resetAt * 1000).toISOString());
 
     // If rate limit exceeded, throw error
     if (!result.allowed) {
       const errorMessage =
-        throttleOptions.errorMessage ||
-        `Too many requests. Limit: ${throttleOptions.limit} per ${throttleOptions.ttl} seconds`;
+        throttleOptions?.errorMessage ||
+        `Too many requests. Limit: ${limit} per ${ttl} seconds`;
 
       throw new HttpException(
         {
           statusCode: HttpStatus.TOO_MANY_REQUESTS,
           message: errorMessage,
-          limit: throttleOptions.limit,
+          limit,
           remaining: result.remaining,
           resetAt: new Date(result.resetAt * 1000).toISOString(),
         },

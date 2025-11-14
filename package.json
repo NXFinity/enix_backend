@@ -1,6 +1,6 @@
 {
   "name": "backend",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "",
   "author": "",
   "private": true,
@@ -156,6 +156,7 @@
       "<rootDir>/libs/"
     ],
     "moduleNameMapper": {
+      "^@caching/caching(|/.*)$": "<rootDir>/libs/caching/src/$1",
       "^@database/database(|/.*)$": "<rootDir>/libs/database/src/$1",
       "^@email/email(|/.*)$": "<rootDir>/libs/email/src/$1",
       "^@kafka/kafka(|/.*)$": "<rootDir>/libs/kafka/src/$1",

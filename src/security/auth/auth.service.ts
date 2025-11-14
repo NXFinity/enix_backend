@@ -19,6 +19,12 @@ import { ResetDto } from './dto/reset.dto';
 import { EmailService } from '@email/email';
 import { LoggingService } from '@logging/logging';
 import { LogCategory } from '@logging/logging';
+import { AuthenticatedRequest } from '../../common/interfaces/authenticated-request.interface';
+import { User } from '../../rest/api/users/assets/entities/user.entity';
+import {
+  BCRYPT_SALT_ROUNDS,
+  PASSWORD_RESET_TOKEN_EXPIRY_HOURS,
+} from '../../common/constants/app.constants';
 
 // Enum
 import { ROLE } from '../roles/assets/enum/role.enum';
@@ -66,7 +72,7 @@ export class AuthService {
     const websocketId = crypto.randomUUID();
 
     // Hash password
-    const saltRounds = 10;
+    const saltRounds = BCRYPT_SALT_ROUNDS;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
     // Generate verification token
@@ -187,7 +193,7 @@ export class AuthService {
       );
     }
 
-    // Generate new verification token (tokens expire after 15 minutes)
+    // Generate new verification token (tokens expire after configured minutes)
     const newVerificationToken = crypto.randomBytes(32).toString('hex');
 
     // Update Security entity with new verification token
@@ -229,7 +235,7 @@ export class AuthService {
   // USER LOGIN & LOGOUT
   // #########################################################
 
-  async login(loginDto: LoginDto, request: any) {
+  async login(loginDto: LoginDto, request: AuthenticatedRequest) {
     const { email, password } = loginDto;
 
     // Find user with security relation
@@ -274,19 +280,28 @@ export class AuthService {
 
     // Store user in session (without password)
     const { password: _, security, ...userWithoutPassword } = user;
-    (request.session as any).user = {
-      id: user.id,
-      email: user.email,
-      username: user.username,
-      displayName: user.displayName,
-      role: user.role,
-      websocketId: user.websocketId,
-      isVerified: user.security.isVerified,
-    };
+    if (request.session) {
+      request.session.user = {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        displayName: user.displayName,
+        role: user.role,
+        websocketId: user.websocketId,
+        isVerified: user.security.isVerified,
+      };
+    }
 
     // Save session - await to ensure session is saved before returning
+    if (!request.session) {
+      throw new HttpException(
+        'Session not available',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
     await new Promise<void>((resolve, reject) => {
-      request.session.save((err: any) => {
+      request.session!.save((err: any) => {
         if (err) {
           this.loggingService.error(
             'Session save error',
@@ -316,9 +331,14 @@ export class AuthService {
     };
   }
 
-  async logout(request: any) {
+  async logout(request: AuthenticatedRequest) {
+    if (!request.session) {
+      // Session already destroyed or doesn't exist
+      return Promise.resolve();
+    }
+
     return new Promise<void>((resolve, reject) => {
-      request.session.destroy((err: any) => {
+      request.session!.destroy((err: any) => {
         if (err) {
           this.loggingService.error(
             'Session destroy error',
@@ -346,9 +366,9 @@ export class AuthService {
   // USER CHANGE, FORGOT & RESET PASSWORD
   // #########################################################
 
-  async changePassword(changeDto: ChangeDto, request: any) {
+  async changePassword(changeDto: ChangeDto, request: AuthenticatedRequest) {
     const { currentPassword, newPassword } = changeDto;
-    const userId = (request.user as any)?.id || (request.session as any)?.user?.id;
+    const userId = request.user?.id || request.session?.user?.id;
 
     if (!userId) {
       throw new HttpException(
@@ -382,7 +402,7 @@ export class AuthService {
     }
 
     // Hash new password
-    const saltRounds = 10;
+    const saltRounds = BCRYPT_SALT_ROUNDS;
     const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
 
     // Update password
@@ -435,10 +455,10 @@ export class AuthService {
       };
     }
 
-    // Generate password reset token (expires in 1 hour)
+    // Generate password reset token (expires in configured hours)
     const resetToken = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 1);
+    expiresAt.setHours(expiresAt.getHours() + PASSWORD_RESET_TOKEN_EXPIRY_HOURS);
 
     // Update Security entity with reset token
     await this.usersService.updatePasswordResetToken(
@@ -500,7 +520,7 @@ export class AuthService {
     }
 
     // Hash new password
-    const saltRounds = 10;
+    const saltRounds = BCRYPT_SALT_ROUNDS;
     const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
 
     // Update password

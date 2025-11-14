@@ -14,6 +14,7 @@ import {
   roleHasPermission,
   roleHasAnyPermission,
 } from '../config/role-permissions.config';
+import { AuthenticatedRequest } from '../../../../common/interfaces/authenticated-request.interface';
 
 @Injectable()
 export class RoleGuard implements CanActivate {
@@ -39,7 +40,7 @@ export class RoleGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const user = request.user || request.session?.user;
 
     if (!user) {

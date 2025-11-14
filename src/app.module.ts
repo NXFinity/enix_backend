@@ -3,15 +3,18 @@ import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from '@database/database';
 import { RedisModule } from '@redis/redis';
 import { ThrottleModule } from '@throttle/throttle';
+import { CachingModule } from '@caching/caching';
 import { AuthModule } from './security/auth/auth.module';
 import { RolesModule } from './security/roles';
 import { UsersModule } from './rest/api/users/users.module';
+import { WebsocketModule } from './rest/websocket/websocket.module';
 import { SessionStoreConfig } from './config/session-store.config';
 
 // Validation
 import * as Joi from 'joi';
 // Guards
 import { AuthGuard } from './security/auth/guards/auth.guard';
+import { ThrottleGuard } from '@throttle/throttle';
 import { HealthModule } from './services/health/health.module';
 
 // Configuration Variables
@@ -99,6 +102,12 @@ import { HealthModule } from './services/health/health.module';
         SESSION_TTL: Joi.number().required().min(60).max(31536000), // 1 minute to 1 year
 
         // ============================================
+        // THROTTLE VALIDATION
+        // ============================================
+        THROTTLE_DEFAULT_LIMIT: Joi.number().default(100).min(1).max(10000),
+        THROTTLE_DEFAULT_TTL: Joi.number().default(60).min(1).max(3600), // 1 second to 1 hour
+
+        // ============================================
         // URL VALIDATION
         // ============================================
         FRONTEND_URL: Joi.string().uri().allow('').default(''),
@@ -150,14 +159,17 @@ import { HealthModule } from './services/health/health.module';
     DatabaseModule,
     RedisModule,
     ThrottleModule,
+    CachingModule,
     AuthModule,
     RolesModule,
     UsersModule,
+    WebsocketModule,
     HealthModule,
   ],
   controllers: [],
   providers: [
     { provide: 'APP_GUARD', useClass: AuthGuard },
+    { provide: 'APP_GUARD', useClass: ThrottleGuard },
     SessionStoreConfig,
   ],
 })

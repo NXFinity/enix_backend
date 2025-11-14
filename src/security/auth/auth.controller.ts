@@ -22,8 +22,13 @@ import {
   ApiBody,
   ApiBearerAuth,
 } from '@nestjs/swagger';
-import { Request } from 'express';
+import { AuthenticatedRequest } from '../../common/interfaces/authenticated-request.interface';
 import { Throttle } from '@throttle/throttle';
+import {
+  RATE_LIMITS,
+  VERIFICATION_TOKEN_EXPIRY_MINUTES,
+  PASSWORD_RESET_TOKEN_EXPIRY_HOURS,
+} from '../../common/constants/app.constants';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -36,7 +41,7 @@ export class AuthController {
   // #########################################################
 
   @Public()
-  @Throttle({ limit: 5, ttl: 3600 }) // 5 registrations per hour
+  @Throttle({ limit: RATE_LIMITS.REGISTRATION.LIMIT, ttl: RATE_LIMITS.REGISTRATION.TTL })
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
@@ -96,13 +101,13 @@ export class AuthController {
   // #########################################################
 
   @Public()
-  @Throttle({ limit: 10, ttl: 300 }) // 10 attempts per 5 minutes
+  @Throttle({ limit: RATE_LIMITS.EMAIL_VERIFICATION.LIMIT, ttl: RATE_LIMITS.EMAIL_VERIFICATION.TTL })
   @Post('verify-email')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Verify user email with verification token',
     description:
-      'Verifies a user email address using the token sent to their email. Tokens expire after 15 minutes.',
+      `Verifies a user email address using the token sent to their email. Tokens expire after ${VERIFICATION_TOKEN_EXPIRY_MINUTES} minutes.`,
   })
   @ApiBody({ type: VerifyDto })
   @ApiResponse({
@@ -145,13 +150,13 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ limit: 3, ttl: 900 }) // 3 resends per 15 minutes
+  @Throttle({ limit: RATE_LIMITS.RESEND_VERIFICATION.LIMIT, ttl: RATE_LIMITS.RESEND_VERIFICATION.TTL })
   @Post('resend-verify-email')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Resend verification email with new token',
     description:
-      'Resends a verification email with a new token. Previous tokens are invalidated. Rate limited to 3 requests per 15 minutes.',
+      `Resends a verification email with a new token. Previous tokens are invalidated. Rate limited to ${RATE_LIMITS.RESEND_VERIFICATION.LIMIT} requests per ${RATE_LIMITS.RESEND_VERIFICATION.TTL / 60} minutes.`,
   })
   @ApiBody({ type: ResendVerifyDto })
   @ApiResponse({
@@ -208,13 +213,13 @@ export class AuthController {
   // #########################################################
 
   @Public()
-  @Throttle({ limit: 5, ttl: 900 }) // 5 login attempts per 15 minutes
+  @Throttle({ limit: RATE_LIMITS.LOGIN.LIMIT, ttl: RATE_LIMITS.LOGIN.TTL })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Login user with email and password',
     description:
-      'Authenticates a user with email and password. Creates a session and stores user data including websocketId. Rate limited to 5 attempts per 15 minutes.',
+      `Authenticates a user with email and password. Creates a session and stores user data including websocketId. Rate limited to ${RATE_LIMITS.LOGIN.LIMIT} attempts per ${RATE_LIMITS.LOGIN.TTL / 60} minutes.`,
   })
   @ApiBody({ type: LoginDto })
   @ApiResponse({
@@ -270,7 +275,7 @@ export class AuthController {
       },
     },
   })
-  async login(@Body() loginDto: LoginDto, @Req() request: Request) {
+  async login(@Body() loginDto: LoginDto, @Req() request: AuthenticatedRequest) {
     return this.authService.login(loginDto, request);
   }
 
@@ -308,7 +313,7 @@ export class AuthController {
       },
     },
   })
-  async logout(@Req() request: Request) {
+  async logout(@Req() request: AuthenticatedRequest) {
     await this.authService.logout(request);
     return {
       message: 'Logout successful',
@@ -319,14 +324,14 @@ export class AuthController {
   // USER CHANGE, FORGOT & RESET PASSWORD
   // #########################################################
 
-  @Throttle({ limit: 5, ttl: 3600 }) // 5 password changes per hour
+  @Throttle({ limit: RATE_LIMITS.PASSWORD_CHANGE.LIMIT, ttl: RATE_LIMITS.PASSWORD_CHANGE.TTL })
   @Post('change-password')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Change password for authenticated user',
     description:
-      'Changes the password for the currently authenticated user. Requires current password verification. Rate limited to 5 changes per hour.',
+      `Changes the password for the currently authenticated user. Requires current password verification. Rate limited to ${RATE_LIMITS.PASSWORD_CHANGE.LIMIT} changes per hour.`,
   })
   @ApiBody({ type: ChangeDto })
   @ApiResponse({
@@ -373,19 +378,19 @@ export class AuthController {
   })
   async changePassword(
     @Body() changeDto: ChangeDto,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
   ) {
     return this.authService.changePassword(changeDto, request);
   }
 
   @Public()
-  @Throttle({ limit: 3, ttl: 3600 }) // 3 password reset requests per hour
+  @Throttle({ limit: RATE_LIMITS.FORGOT_PASSWORD.LIMIT, ttl: RATE_LIMITS.FORGOT_PASSWORD.TTL })
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Request password reset email',
     description:
-      'Sends a password reset email if an account with the provided email exists. Does not reveal whether the email exists for security. Rate limited to 3 requests per hour.',
+      `Sends a password reset email if an account with the provided email exists. Does not reveal whether the email exists for security. Rate limited to ${RATE_LIMITS.FORGOT_PASSWORD.LIMIT} requests per hour.`,
   })
   @ApiBody({ type: ForgotDto })
   @ApiResponse({
@@ -407,13 +412,13 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ limit: 5, ttl: 300 }) // 5 reset attempts per 5 minutes
+  @Throttle({ limit: RATE_LIMITS.RESET_PASSWORD.LIMIT, ttl: RATE_LIMITS.RESET_PASSWORD.TTL })
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Reset password using reset token',
     description:
-      'Resets the user password using the token sent via email. Tokens expire after 1 hour. Rate limited to 5 attempts per 5 minutes.',
+      `Resets the user password using the token sent via email. Tokens expire after ${PASSWORD_RESET_TOKEN_EXPIRY_HOURS} hour. Rate limited to ${RATE_LIMITS.RESET_PASSWORD.LIMIT} attempts per ${RATE_LIMITS.RESET_PASSWORD.TTL / 60} minutes.`,
   })
   @ApiBody({ type: ResetDto })
   @ApiResponse({

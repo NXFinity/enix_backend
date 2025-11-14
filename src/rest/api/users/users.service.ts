@@ -169,12 +169,20 @@ export class UsersService {
   // Find by ID
   async findOne(id: string): Promise<User> {
     try {
-      const user = await this.userRepository
-        .createQueryBuilder('user')
-        .leftJoinAndSelect('user.profile', 'profile')
-        .where('user.id = :id', { id })
-        .select() // keep this if you want all columns; later you can explicitly define what to select
-        .getOne();
+      const [user] = await Promise.all([
+        this.userRepository
+          .createQueryBuilder('user')
+          .leftJoinAndSelect('user.profile', 'profile')
+          .where('user.id = :id', { id })
+          .select([
+            'user.id',
+            'user.username',
+            'user.email',
+            'user.isPublic',
+            'profile.id',
+          ])
+          .getOne(),
+      ]);
 
       if (!user) {
         throw new NotFoundException(`User with id ${id} not found`);
@@ -203,7 +211,13 @@ export class UsersService {
         .createQueryBuilder('user')
         .leftJoinAndSelect('user.profile', 'profile')
         .where('user.username = :username', { username })
-        .select() // keep this if you want all columns; later you can explicitly define what to select
+        .select([
+          'user.id',
+          'user.username',
+          'user.email',
+          'user.isPublic',
+          'profile.id',
+        ])
         .getOne();
 
       if (!user) {
@@ -233,7 +247,13 @@ export class UsersService {
         .createQueryBuilder('user')
         .leftJoinAndSelect('user.profile', 'profile')
         .where('user.email = :email', { email })
-        .select() // keep this if you want all columns; later you can explicitly define what to select
+        .select([
+          'user.id',
+          'user.username',
+          'user.email',
+          'user.isPublic',
+          'profile.id',
+        ]) // keep this if you want all columns; later you can explicitly define what to select
         .getOne();
 
       if (!user) {
@@ -294,6 +314,37 @@ export class UsersService {
           category: LogCategory.DATABASE,
           error: error instanceof Error ? error : new Error(String(error)),
           metadata: { username },
+        },
+      );
+      return null;
+    }
+  }
+
+  // Find user by websocketId (for WebSocket authentication)
+  async findByWebsocketId(websocketId: string): Promise<User | null> {
+    try {
+      return await this.userRepository
+        .createQueryBuilder('user')
+        .where('user.websocketId = :websocketId', { websocketId })
+        .select([
+          'user.id',
+          'user.username',
+          'user.displayName',
+          'user.email',
+          'user.websocketId',
+          'user.role',
+          'user.isPublic',
+        ])
+        .getOne();
+    } catch (error) {
+      this.loggingService.error(
+        `Error finding user by websocketId: ${websocketId}`,
+        error instanceof Error ? error.stack : undefined,
+        'UsersService',
+        {
+          category: LogCategory.DATABASE,
+          error: error instanceof Error ? error : new Error(String(error)),
+          metadata: { websocketId },
         },
       );
       return null;

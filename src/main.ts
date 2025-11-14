@@ -8,6 +8,10 @@ import { setupSwagger } from './functions/swagger.function';
 import * as session from 'express-session';
 import * as cookieParser from 'cookie-parser';
 import { SessionStoreConfig } from './config/session-store.config';
+import {
+  SESSION_COOKIE_NAME,
+  SESSION_MAX_AGE_MS,
+} from './common/constants/app.constants';
 
 const chalk = require('chalk');
 const logger = new Logger('Bootstrap');
@@ -73,9 +77,9 @@ async function bootstrap() {
         httpOnly: true,
         secure: configService.get<string>('NODE_ENV') === 'production',
         sameSite: 'lax',
-        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        maxAge: SESSION_MAX_AGE_MS,
       },
-      name: 'metaenix.sid', // Session cookie name
+      name: SESSION_COOKIE_NAME,
     }),
   );
 
