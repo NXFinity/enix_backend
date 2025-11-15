@@ -1790,9 +1790,8 @@ export class PostsService {
 
       const savedBookmark = await this.bookmarkRepository.save(bookmark);
 
-      // Increment bookmarks count
-      post.bookmarksCount += 1;
-      await this.postRepository.save(post);
+      // Increment bookmarks count atomically
+      await this.postRepository.increment({ id: postId }, 'bookmarksCount', 1);
 
       // Invalidate cache
       await this.cachingService.invalidateByTags('post', `post:${postId}`, `user:${userId}:bookmarks`);
@@ -1842,14 +1841,8 @@ export class PostsService {
 
       await this.bookmarkRepository.remove(bookmark);
 
-      // Decrement bookmarks count
-      const post = await this.postRepository.findOne({
-        where: { id: postId },
-      });
-      if (post && post.bookmarksCount > 0) {
-        post.bookmarksCount -= 1;
-        await this.postRepository.save(post);
-      }
+      // Decrement bookmarks count atomically
+      await this.postRepository.decrement({ id: postId }, 'bookmarksCount', 1);
 
       // Invalidate cache
       await this.cachingService.invalidateByTags('post', `post:${postId}`, `user:${userId}:bookmarks`);
@@ -2217,9 +2210,8 @@ export class PostsService {
 
       const savedReport = await this.reportRepository.save(report);
 
-      // Increment reports count
-      post.reportsCount += 1;
-      await this.postRepository.save(post);
+      // Increment reports count atomically
+      await this.postRepository.increment({ id: postId }, 'reportsCount', 1);
 
       // Invalidate cache
       await this.cachingService.invalidateByTags('post', `post:${postId}`);
@@ -2505,8 +2497,10 @@ export class PostsService {
       }
 
       collection.posts.push(post);
-      collection.postsCount += 1;
       const savedCollection = await this.collectionRepository.save(collection);
+
+      // Increment collection posts count atomically
+      await this.collectionRepository.increment({ id: collectionId }, 'postsCount', 1);
 
       this.loggingService.log('Post added to collection', 'PostsService', {
         category: LogCategory.USER_MANAGEMENT,
@@ -2557,8 +2551,10 @@ export class PostsService {
       }
 
       collection.posts = collection.posts.filter((p) => p.id !== postId);
-      collection.postsCount = Math.max(0, collection.postsCount - 1);
       await this.collectionRepository.save(collection);
+
+      // Decrement collection posts count atomically
+      await this.collectionRepository.decrement({ id: collectionId }, 'postsCount', 1);
 
       this.loggingService.log('Post removed from collection', 'PostsService', {
         category: LogCategory.USER_MANAGEMENT,

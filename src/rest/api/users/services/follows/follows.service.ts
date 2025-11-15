@@ -3,16 +3,9 @@ import {
   NotFoundException,
   BadRequestException,
   InternalServerErrorException,
-  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import {
-  Repository,
-  In,
-  MoreThanOrEqual,
-  LessThanOrEqual,
-  Between,
-} from 'typeorm';
+import { Repository, In, MoreThanOrEqual, Between } from 'typeorm';
 import { Follow } from './assets/entities/follow.entity';
 import { User } from '../../assets/entities/user.entity';
 import { LoggingService } from '@logging/logging';
@@ -1446,8 +1439,7 @@ export class FollowsService {
             log.metadata.followerId)
         ) {
           const metadata = log.metadata;
-          const targetUserId =
-            metadata.followingId || metadata.followerId;
+          const targetUserId = metadata.followingId || metadata.followerId;
 
           if (targetUserId) {
             const targetUser = await this.userRepository.findOne({
