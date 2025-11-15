@@ -25,6 +25,9 @@ import { User } from '../../../../assets/entities/user.entity';
 @Index(['isArchived', 'dateCreated'])
 @Index(['postType', 'dateCreated'])
 @Index(['scheduledDate'])
+// Note: GIN indexes for hashtags and mentions should be added via migration for efficient array search:
+// CREATE INDEX idx_post_hashtags_gin ON account.userPost USING GIN (hashtags);
+// CREATE INDEX idx_post_mentions_gin ON account.userPost USING GIN (mentions);
 export class Post extends BaseEntity {
   // #########################################################
   // Post Content

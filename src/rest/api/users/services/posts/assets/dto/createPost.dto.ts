@@ -7,6 +7,8 @@ import {
   IsArray,
   MaxLength,
   IsNotEmpty,
+  IsDateString,
+  ValidateIf,
 } from 'class-validator';
 
 export class CreatePostDto {
@@ -119,6 +121,16 @@ export class CreatePostDto {
   @IsOptional()
   @IsString()
   parentPostId?: string;
+
+  @ApiProperty({
+    description: 'Scheduled date for the post (ISO 8601 format). Must be in the future.',
+    example: '2025-12-31T10:00:00Z',
+    required: false,
+  })
+  @IsOptional()
+  @IsDateString()
+  @ValidateIf((o) => o.scheduledDate !== undefined)
+  scheduledDate?: string;
 }
 
 export class UpdatePostDto extends PartialType(CreatePostDto) {}

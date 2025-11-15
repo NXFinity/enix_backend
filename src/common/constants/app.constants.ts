@@ -153,3 +153,18 @@ export const TIME_SECONDS = {
   DAY: 86400,
 } as const;
 
+// ============================================
+// DEFAULT IMAGE URLs
+// ============================================
+
+/**
+ * Default image URLs for user profiles
+ * These can be overridden via environment variables
+ */
+export const DEFAULT_PROFILE_IMAGES = {
+  AVATAR: process.env.DEFAULT_AVATAR_URL || 'https://i.postimg.cc/SxrVKbFk/hacker.png',
+  COVER: process.env.DEFAULT_COVER_URL || 'https://i.postimg.cc/k52jYYzB/cover-1.png',
+  BANNER: process.env.DEFAULT_BANNER_URL || 'https://i.postimg.cc/Y26dPWn8/cover.png',
+  OFFLINE: process.env.DEFAULT_OFFLINE_URL || 'https://i.postimg.cc/v8VzVVwF/offline.png',
+} as const;
+

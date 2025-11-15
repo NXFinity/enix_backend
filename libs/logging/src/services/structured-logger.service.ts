@@ -189,8 +189,9 @@ export class StructuredLoggerService implements LoggerService {
           ...options,
         })
         .catch((err) => {
-          // Only log to console if database save fails
-          console.error('Failed to save audit log:', err);
+          // Only log to Winston directly if database save fails (avoid circular dependency)
+          // This is a fallback when LoggingService itself fails
+          this.logger.error('Failed to save audit log:', err);
         });
     }
   }

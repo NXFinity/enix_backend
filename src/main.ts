@@ -128,7 +128,8 @@ async function bootstrap() {
     corsOriginsList = `\n   CORS Origins: ${chalk.red('ERROR - Check logs above')}`;
   }
 
-  console.log(`
+  // Log startup information using NestJS Logger (LoggingService not available in bootstrap)
+  logger.log(`
   ------------------------------------------------------
 
    Application is running on: ${chalk.blue(`http://localhost:${port}/${globalPrefix}`)}

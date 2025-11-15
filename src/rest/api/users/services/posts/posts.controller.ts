@@ -39,6 +39,7 @@ import {
   ApiConsumes,
 } from '@nestjs/swagger';
 import { CurrentUser } from 'src/security/auth/decorators/currentUser.decorator';
+import { User } from '../../assets/entities/user.entity';
 import { Public } from 'src/security/auth/decorators/public.decorator';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { Throttle } from '@throttle/throttle';
@@ -64,8 +65,8 @@ export class PostsController {
   })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  createPost(@CurrentUser() user: any, @Body() createPostDto: CreatePostDto) {
-    const userId = user?.id || user?.userId;
+  createPost(@CurrentUser() user: User, @Body() createPostDto: CreatePostDto) {
+    const userId = user?.id;
     if (!userId) {
       throw new UnauthorizedException('User ID not found');
     }
@@ -147,7 +148,7 @@ export class PostsController {
   @ApiResponse({ status: 400, description: 'Bad request - invalid file type or size' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async createPostWithFiles(
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @UploadedFiles()
     files: {
       files?: Express.Multer.File[];
@@ -158,7 +159,7 @@ export class PostsController {
     @Body('allowComments') allowComments?: boolean,
     @Body('parentPostId') parentPostId?: string,
   ) {
-    const userId = user?.id || user?.userId;
+    const userId = user?.id;
     if (!userId) {
       throw new UnauthorizedException('User ID not found');
     }
@@ -193,11 +194,11 @@ export class PostsController {
   @ApiResponse({ status: 403, description: 'Comments disabled' })
   @ApiResponse({ status: 404, description: 'Post not found' })
   createComment(
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @Param('postId') postId: string,
     @Body() createCommentDto: CreateCommentDto,
   ) {
-    const userId = user?.id || user?.userId;
+    const userId = user?.id;
     if (!userId) {
       throw new UnauthorizedException('User ID not found');
     }
@@ -214,8 +215,8 @@ export class PostsController {
   @ApiResponse({ status: 400, description: 'Already liked' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Post not found' })
-  likePost(@CurrentUser() user: any, @Param('postId') postId: string) {
-    const userId = user?.id || user?.userId;
+  likePost(@CurrentUser() user: User, @Param('postId') postId: string) {
+    const userId = user?.id;
     if (!userId) {
       throw new UnauthorizedException('User ID not found');
     }
@@ -231,8 +232,8 @@ export class PostsController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Like not found' })
-  unlikePost(@CurrentUser() user: any, @Param('postId') postId: string) {
-    const userId = user?.id || user?.userId;
+  unlikePost(@CurrentUser() user: User, @Param('postId') postId: string) {
+    const userId = user?.id;
     if (!userId) {
       throw new UnauthorizedException('User ID not found');
     }
@@ -251,11 +252,11 @@ export class PostsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Post not found' })
   sharePost(
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @Param('postId') postId: string,
     @Body() createShareDto: CreateShareDto,
   ) {
-    const userId = user?.id || user?.userId;
+    const userId = user?.id;
     if (!userId) {
       throw new UnauthorizedException('User ID not found');
     }
@@ -278,7 +279,7 @@ export class PostsController {
     description: 'Posts retrieved successfully',
   })
   findAll(@Query() paginationDto: PaginationDto, @CurrentUser() user?: any) {
-    const userId = user?.id || user?.userId;
+    const userId = user?.id;
     return this.postsService.findAll(paginationDto, userId);
   }
 
@@ -300,7 +301,7 @@ export class PostsController {
     @Query() paginationDto: PaginationDto,
     @CurrentUser() user?: any,
   ) {
-    const userId = user?.id || user?.userId;
+    const userId = user?.id;
     return this.postsService.findByUserId(targetUserId, paginationDto, userId);
   }
 
@@ -314,7 +315,7 @@ export class PostsController {
   })
   @ApiResponse({ status: 404, description: 'Post not found' })
   findOne(@Param('postId') postId: string, @CurrentUser() user?: any) {
-    const userId = user?.id || user?.userId;
+    const userId = user?.id;
     return this.postsService.findOne(postId, userId);
   }
 
@@ -336,7 +337,7 @@ export class PostsController {
     @Query() paginationDto: PaginationDto,
     @CurrentUser() user?: any,
   ) {
-    const userId = user?.id || user?.userId;
+    const userId = user?.id;
     return this.postsService.findCommentsByPostId(
       postId,
       paginationDto,
@@ -362,7 +363,7 @@ export class PostsController {
     @Query() paginationDto: PaginationDto,
     @CurrentUser() user?: any,
   ) {
-    const userId = user?.id || user?.userId;
+    const userId = user?.id;
     return this.postsService.findRepliesByCommentId(
       commentId,
       paginationDto,
@@ -380,8 +381,8 @@ export class PostsController {
   @ApiResponse({ status: 400, description: 'Already liked' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Comment not found' })
-  likeComment(@CurrentUser() user: any, @Param('commentId') commentId: string) {
-    const userId = user?.id || user?.userId;
+  likeComment(@CurrentUser() user: User, @Param('commentId') commentId: string) {
+    const userId = user?.id;
     if (!userId) {
       throw new UnauthorizedException('User ID not found');
     }
@@ -398,10 +399,10 @@ export class PostsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Like not found' })
   unlikeComment(
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @Param('commentId') commentId: string,
   ) {
-    const userId = user?.id || user?.userId;
+    const userId = user?.id;
     if (!userId) {
       throw new UnauthorizedException('User ID not found');
     }
@@ -424,11 +425,11 @@ export class PostsController {
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Post not found' })
   updatePost(
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @Param('postId') postId: string,
     @Body() updatePostDto: UpdatePostDto,
   ) {
-    const userId = user?.id || user?.userId;
+    const userId = user?.id;
     if (!userId) {
       throw new UnauthorizedException('User ID not found');
     }
@@ -459,11 +460,11 @@ export class PostsController {
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Post not found' })
   togglePinPost(
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @Param('postId') postId: string,
     @Body('isPinned') isPinned: boolean,
   ) {
-    const userId = user?.id || user?.userId;
+    const userId = user?.id;
     if (!userId) {
       throw new UnauthorizedException('User ID not found');
     }
@@ -482,11 +483,11 @@ export class PostsController {
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Comment not found' })
   updateComment(
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @Param('commentId') commentId: string,
     @Body() updateCommentDto: UpdateCommentDto,
   ) {
-    const userId = user?.id || user?.userId;
+    const userId = user?.id;
     if (!userId) {
       throw new UnauthorizedException('User ID not found');
     }
@@ -507,8 +508,8 @@ export class PostsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Post not found' })
-  deletePost(@CurrentUser() user: any, @Param('postId') postId: string) {
-    const userId = user?.id || user?.userId;
+  deletePost(@CurrentUser() user: User, @Param('postId') postId: string) {
+    const userId = user?.id;
     if (!userId) {
       throw new UnauthorizedException('User ID not found');
     }
@@ -526,10 +527,10 @@ export class PostsController {
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Comment not found' })
   deleteComment(
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @Param('commentId') commentId: string,
   ) {
-    const userId = user?.id || user?.userId;
+    const userId = user?.id;
     if (!userId) {
       throw new UnauthorizedException('User ID not found');
     }
@@ -552,11 +553,11 @@ export class PostsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Post not found' })
   bookmarkPost(
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @Param('postId') postId: string,
     @Body() bookmarkDto?: BookmarkPostDto,
   ) {
-    const userId = user?.id || user?.userId;
+    const userId = user?.id;
     if (!userId) {
       throw new UnauthorizedException('User ID not found');
     }
@@ -572,8 +573,8 @@ export class PostsController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Bookmark not found' })
-  unbookmarkPost(@CurrentUser() user: any, @Param('postId') postId: string) {
-    const userId = user?.id || user?.userId;
+  unbookmarkPost(@CurrentUser() user: User, @Param('postId') postId: string) {
+    const userId = user?.id;
     if (!userId) {
       throw new UnauthorizedException('User ID not found');
     }
@@ -590,10 +591,10 @@ export class PostsController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   getBookmarkedPosts(
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @Query() paginationDto: PaginationDto,
   ) {
-    const userId = user?.id || user?.userId;
+    const userId = user?.id;
     if (!userId) {
       throw new UnauthorizedException('User ID not found');
     }
@@ -619,7 +620,7 @@ export class PostsController {
     @Query() paginationDto: PaginationDto,
     @CurrentUser() user?: any,
   ) {
-    const userId = user?.id || user?.userId;
+    const userId = user?.id;
     if (!query || query.trim().length === 0) {
       throw new BadRequestException('Search query is required');
     }
@@ -647,7 +648,7 @@ export class PostsController {
     @Query() paginationDto: PaginationDto,
     @CurrentUser() user?: any,
   ) {
-    const userId = user?.id || user?.userId;
+    const userId = user?.id;
     return this.postsService.filterPostsByType(type, paginationDto, userId);
   }
 
@@ -667,11 +668,11 @@ export class PostsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Post not found' })
   reportPost(
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @Param('postId') postId: string,
     @Body() reportDto: ReportPostDto,
   ) {
-    const userId = user?.id || user?.userId;
+    const userId = user?.id;
     if (!userId) {
       throw new UnauthorizedException('User ID not found');
     }
@@ -698,11 +699,11 @@ export class PostsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Post not found' })
   reactToPost(
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @Param('postId') postId: string,
     @Body() reactDto: ReactToPostDto,
   ) {
-    const userId = user?.id || user?.userId;
+    const userId = user?.id;
     if (!userId) {
       throw new UnauthorizedException('User ID not found');
     }
@@ -723,10 +724,10 @@ export class PostsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Reaction not found' })
   removeReactionFromPost(
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @Param('postId') postId: string,
   ) {
-    const userId = user?.id || user?.userId;
+    const userId = user?.id;
     if (!userId) {
       throw new UnauthorizedException('User ID not found');
     }
@@ -744,11 +745,11 @@ export class PostsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Comment not found' })
   reactToComment(
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @Param('commentId') commentId: string,
     @Body() reactDto: ReactToPostDto,
   ) {
-    const userId = user?.id || user?.userId;
+    const userId = user?.id;
     if (!userId) {
       throw new UnauthorizedException('User ID not found');
     }
@@ -770,10 +771,10 @@ export class PostsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Reaction not found' })
   removeReactionFromComment(
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @Param('commentId') commentId: string,
   ) {
-    const userId = user?.id || user?.userId;
+    const userId = user?.id;
     if (!userId) {
       throw new UnauthorizedException('User ID not found');
     }
@@ -793,10 +794,10 @@ export class PostsController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   createCollection(
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @Body() createCollectionDto: CreateCollectionDto,
   ) {
-    const userId = user?.id || user?.userId;
+    const userId = user?.id;
     if (!userId) {
       throw new UnauthorizedException('User ID not found');
     }
@@ -821,11 +822,11 @@ export class PostsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Collection or post not found' })
   addPostToCollection(
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @Param('collectionId') collectionId: string,
     @Param('postId') postId: string,
   ) {
-    const userId = user?.id || user?.userId;
+    const userId = user?.id;
     if (!userId) {
       throw new UnauthorizedException('User ID not found');
     }
@@ -843,11 +844,11 @@ export class PostsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Collection not found' })
   removePostFromCollection(
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @Param('collectionId') collectionId: string,
     @Param('postId') postId: string,
   ) {
-    const userId = user?.id || user?.userId;
+    const userId = user?.id;
     if (!userId) {
       throw new UnauthorizedException('User ID not found');
     }
@@ -856,6 +857,41 @@ export class PostsController {
       collectionId,
       postId,
     );
+  }
+
+  @Get('collections/:collectionId/posts')
+  @ApiOperation({ summary: 'Get posts from a collection with pagination' })
+  @ApiParam({ name: 'collectionId', description: 'Collection ID' })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    enum: ['dateCreated', 'likesCount', 'commentsCount', 'viewsCount'],
+    example: 'dateCreated',
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    required: false,
+    enum: ['ASC', 'DESC'],
+    example: 'DESC',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Collection posts retrieved successfully',
+  })
+  @ApiResponse({ status: 403, description: 'Forbidden - Collection is private' })
+  @ApiResponse({ status: 404, description: 'Collection not found' })
+  getCollectionPosts(
+    @CurrentUser() user: User,
+    @Param('collectionId') collectionId: string,
+    @Query() paginationDto: PaginationDto,
+  ) {
+    const userId = user?.id;
+    if (!userId) {
+      throw new UnauthorizedException('User ID not found');
+    }
+    return this.postsService.getCollectionPosts(collectionId, userId, paginationDto);
   }
 
   // #########################################################
@@ -872,8 +908,8 @@ export class PostsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Post not found' })
-  archivePost(@CurrentUser() user: any, @Param('postId') postId: string) {
-    const userId = user?.id || user?.userId;
+  archivePost(@CurrentUser() user: User, @Param('postId') postId: string) {
+    const userId = user?.id;
     if (!userId) {
       throw new UnauthorizedException('User ID not found');
     }
@@ -890,8 +926,8 @@ export class PostsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Post not found' })
-  unarchivePost(@CurrentUser() user: any, @Param('postId') postId: string) {
-    const userId = user?.id || user?.userId;
+  unarchivePost(@CurrentUser() user: User, @Param('postId') postId: string) {
+    const userId = user?.id;
     if (!userId) {
       throw new UnauthorizedException('User ID not found');
     }
@@ -915,11 +951,11 @@ export class PostsController {
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Post not found' })
   schedulePost(
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @Param('postId') postId: string,
     @Body() scheduleDto: SchedulePostDto,
   ) {
-    const userId = user?.id || user?.userId;
+    const userId = user?.id;
     if (!userId) {
       throw new UnauthorizedException('User ID not found');
     }
@@ -944,8 +980,8 @@ export class PostsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - can only view own post analytics' })
   @ApiResponse({ status: 404, description: 'Post not found' })
-  getPostAnalytics(@CurrentUser() user: any, @Param('postId') postId: string) {
-    const userId = user?.id || user?.userId;
+  getPostAnalytics(@CurrentUser() user: User, @Param('postId') postId: string) {
+    const userId = user?.id;
     if (!userId) {
       throw new UnauthorizedException('User ID not found');
     }

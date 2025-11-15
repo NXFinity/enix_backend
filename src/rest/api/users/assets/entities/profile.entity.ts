@@ -1,6 +1,7 @@
 import { Column, Entity, JoinColumn, OneToOne } from 'typeorm';
 import { BaseEntity } from '@database/database';
 import { User } from './user.entity';
+import { DEFAULT_PROFILE_IMAGES } from 'src/common/constants/app.constants';
 
 @Entity('userProfile', { schema: 'account' })
 export class Profile extends BaseEntity {
@@ -19,22 +20,22 @@ export class Profile extends BaseEntity {
 
   @Column({
     type: 'varchar',
-    default: 'https://i.postimg.cc/SxrVKbFk/hacker.png',
+    default: DEFAULT_PROFILE_IMAGES.AVATAR,
   })
   avatar: string;
   @Column({
     type: 'varchar',
-    default: 'https://i.postimg.cc/k52jYYzB/cover-1.png',
+    default: DEFAULT_PROFILE_IMAGES.COVER,
   })
   cover: string;
   @Column({
     type: 'varchar',
-    default: 'https://i.postimg.cc/Y26dPWn8/cover.png',
+    default: DEFAULT_PROFILE_IMAGES.BANNER,
   })
   banner: string;
   @Column({
     type: 'varchar',
-    default: 'https://i.postimg.cc/v8VzVVwF/offline.png',
+    default: DEFAULT_PROFILE_IMAGES.OFFLINE,
   })
   offline: string;
   @Column({ type: 'varchar', nullable: true })

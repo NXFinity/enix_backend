@@ -3,6 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
+import { JwtPayload } from '../interfaces/jwt-payload.interface';
 
 /**
  * Refresh Token Strategy
@@ -42,7 +43,7 @@ export class RefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
    * @param payload - Decoded JWT payload
    * @returns User object with refresh token
    */
-  async validate(req: Request, payload: any) {
+  async validate(req: Request, payload: JwtPayload) {
     if (!payload.sub) {
       throw new UnauthorizedException('Invalid refresh token payload');
     }

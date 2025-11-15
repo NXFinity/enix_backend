@@ -181,6 +181,15 @@ export class PostsService {
       const mentions = this.extractMentions(sanitizedContent);
       const postType = this.determinePostType(sanitizedMediaUrl, sanitizedMediaUrls);
 
+      // Validate scheduled date if provided
+      let scheduledDate: Date | null = null;
+      if (createPostDto.scheduledDate) {
+        scheduledDate = new Date(createPostDto.scheduledDate);
+        if (scheduledDate <= new Date()) {
+          throw new BadRequestException('Scheduled date must be in the future');
+        }
+      }
+
       const post = this.postRepository.create({
         content: sanitizedContent,
         mediaUrl: sanitizedMediaUrl,
@@ -198,6 +207,7 @@ export class PostsService {
         allowComments: createPostDto.allowComments ?? true,
         isDraft: createPostDto.isDraft ?? false,
         parentPostId: createPostDto.parentPostId,
+        scheduledDate,
       });
 
       // If parentPostId is provided, verify it exists
@@ -906,9 +916,8 @@ export class PostsService {
         isShared = !!share;
       }
 
-      // Increment views count
-      post.viewsCount += 1;
-      await this.postRepository.save(post);
+      // Note: View tracking is handled by trackPostView() called above
+      // Do not increment here to avoid double counting
 
       return {
         ...post,
@@ -1940,8 +1949,8 @@ export class PostsService {
         return;
       }
 
-      post.viewsCount += 1;
-      await this.postRepository.save(post);
+      // Use atomic increment to prevent race conditions
+      await this.postRepository.increment({ id: postId }, 'viewsCount', 1);
 
       // Invalidate cache
       await this.cachingService.invalidateByTags('post', `post:${postId}`);
@@ -2545,6 +2554,135 @@ export class PostsService {
       );
 
       throw new InternalServerErrorException('Failed to remove post from collection');
+    }
+  }
+
+  /**
+   * Get posts from a collection with pagination
+   */
+  async getCollectionPosts(
+    collectionId: string,
+    userId: string,
+    paginationDto: PaginationDto = {},
+  ): Promise<PaginationResponse<Post & { isLiked: boolean } & Record<string, any>>> {
+    try {
+      // First check collection exists and user has access
+      const collection = await this.collectionRepository.findOne({
+        where: { id: collectionId },
+      });
+
+      if (!collection) {
+        throw new NotFoundException('Collection not found');
+      }
+
+      // Check if user can access this collection
+      if (!collection.isPublic && collection.userId !== userId) {
+        throw new ForbiddenException('You do not have access to this collection');
+      }
+
+      const page = paginationDto.page || 1;
+      const limit = paginationDto.limit || 10;
+      const sortBy = paginationDto.sortBy || 'dateCreated';
+      const sortOrder = paginationDto.sortOrder || 'DESC';
+
+      // Validate sortBy field
+      const allowedSortFields = ['dateCreated', 'likesCount', 'commentsCount', 'viewsCount'];
+      const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'dateCreated';
+      const safeSortOrder = sortOrder === 'ASC' ? 'ASC' : 'DESC';
+
+      // Get all post IDs from collection using the join table
+      const collectionWithPosts = await this.collectionRepository.findOne({
+        where: { id: collectionId },
+        relations: ['posts'],
+      });
+
+      const allPostIds = collectionWithPosts?.posts.map((post) => post.id) || [];
+
+      if (allPostIds.length === 0) {
+        return {
+          data: [],
+          meta: {
+            page,
+            limit,
+            total: 0,
+            totalPages: 0,
+            hasNextPage: false,
+            hasPreviousPage: false,
+          },
+        };
+      }
+
+      // Build query for posts with pagination
+      const skip = (page - 1) * limit;
+      const queryBuilder = this.postRepository
+        .createQueryBuilder('post')
+        .leftJoinAndSelect('post.user', 'user')
+        .leftJoinAndSelect('user.profile', 'profile')
+        .where('post.id IN (:...postIds)', { postIds: allPostIds })
+        .andWhere('post.isDraft = :isDraft', { isDraft: false })
+        .andWhere('post.isArchived = :isArchived', { isArchived: false })
+        .orderBy(`post.${safeSortBy}`, safeSortOrder)
+        .skip(skip)
+        .take(limit);
+
+      const posts = await queryBuilder.getMany();
+      const total = allPostIds.length;
+
+      // Batch fetch likes for all posts
+      const postIds = posts.map((post) => post.id);
+      let userLikes: Set<string> = new Set();
+
+      if (userId && postIds.length > 0) {
+        const likes = await this.likeRepository.find({
+          where: {
+            userId,
+            postId: In(postIds.filter((id): id is string => id !== null)),
+          },
+        });
+        userLikes = new Set(likes.map((like) => like.postId).filter((id): id is string => id !== null));
+      }
+
+      // Add isLiked flag to each post
+      const postsWithLikes = posts.map((post) => ({
+        ...post,
+        isLiked: userLikes.has(post.id),
+      })) as (Post & { isLiked: boolean } & Record<string, any>)[];
+
+      const totalPages = Math.ceil(total / limit);
+      const meta: PaginationMeta = {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      };
+
+      return {
+        data: postsWithLikes,
+        meta,
+      };
+    } catch (error) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
+
+      this.loggingService.error(
+        'Error getting collection posts',
+        error instanceof Error ? error.stack : undefined,
+        'PostsService',
+        {
+          category: LogCategory.DATABASE,
+          userId,
+          error: error instanceof Error ? error : new Error(String(error)),
+          metadata: { collectionId },
+        },
+      );
+
+      throw new InternalServerErrorException('Failed to get collection posts');
     }
   }
 

@@ -45,7 +45,14 @@ export class AuditLogService {
       return await this.auditLogRepository.save(auditLog);
     } catch (error) {
       // Don't throw - logging failures shouldn't break the app
-      console.error('Failed to save audit log to database:', error);
+      // Use Winston logger directly to avoid circular dependency with LoggingService
+      // This is a fallback when LoggingService itself fails
+      const winston = require('winston');
+      const fallbackLogger = winston.createLogger({
+        level: 'error',
+        transports: [new winston.transports.Console()],
+      });
+      fallbackLogger.error('Failed to save audit log to database:', error);
       return null;
     }
   }

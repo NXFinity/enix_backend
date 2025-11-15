@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
+import { ErrorResponse } from './interfaces/error-response.interface';
 
 @Catch(HttpException)
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -31,13 +32,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
       exceptionResponse !== null &&
       'message' in exceptionResponse
     ) {
-      message = (exceptionResponse as any).message;
+      const responseObj = exceptionResponse as { message: string | string[] };
+      message = responseObj.message;
     } else {
       message = exception.message || 'An error occurred';
     }
 
     // In production, hide stack traces and internal error details
-    const errorResponse: any = {
+    const errorResponse: ErrorResponse = {
       statusCode: status,
       message: Array.isArray(message) ? message : [message],
       timestamp: new Date().toISOString(),
@@ -55,7 +57,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
         exceptionResponse !== null &&
         'error' in exceptionResponse
       ) {
-        errorResponse.error = (exceptionResponse as any).error;
+        const responseObj = exceptionResponse as { error?: string };
+        errorResponse.error = responseObj.error || exception.name;
       }
     }
 
