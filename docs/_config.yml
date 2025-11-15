@@ -5,7 +5,7 @@ description: API documentation for Meta EN|IX platform
 version: 1.3.0
 
 # Theme selection
-theme: jekyll-theme-minimal
+theme: jekyll-theme-cayman
 
 # Site settings
 baseurl: ""

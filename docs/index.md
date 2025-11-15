@@ -6,7 +6,7 @@ Welcome to the Meta EN|IX API documentation. Build applications that integrate w
 
 ## Quick Links
 
-- [Getting Started](getting-started.md) - Start building with our API
+- [Getting Started](getting/getting-started.md) - Start building with our API
 - [API Reference](#) - Complete API documentation
 - [Changelogs](../docs/backend/changelogs/) - Version history
 
