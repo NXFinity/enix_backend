@@ -14,6 +14,7 @@ import { ResendVerifyDto } from './dto/resend-verify.dto';
 import { ChangeDto } from './dto/change.dto';
 import { ForgotDto } from './dto/forgot.dto';
 import { ResetDto } from './dto/reset.dto';
+import { VerifyLogin2faDto } from './dto/verify-login-2fa.dto';
 import { Public } from './decorators/public.decorator';
 import {
   ApiTags,
@@ -241,29 +242,44 @@ export class AuthController {
   @ApiBody({ type: LoginDto })
   @ApiResponse({
     status: 200,
-    description: 'Login successful',
+    description: 'Login successful or 2FA required',
     schema: {
-      type: 'object',
-      properties: {
-        message: { type: 'string', example: 'Login successful' },
-        user: {
+      oneOf: [
+        {
           type: 'object',
           properties: {
-            id: {
-              type: 'string',
-              example: '123e4567-e89b-12d3-a456-426614174000',
+            message: { type: 'string', example: 'Login successful' },
+            user: {
+              type: 'object',
+              properties: {
+                id: {
+                  type: 'string',
+                  example: '123e4567-e89b-12d3-a456-426614174000',
+                },
+                username: { type: 'string', example: 'johndoe' },
+                displayName: { type: 'string', example: 'johndoe' },
+                email: { type: 'string', example: 'john.doe@example.com' },
+                websocketId: {
+                  type: 'string',
+                  example: '123e4567-e89b-12d3-a456-426614174001',
+                },
+                role: { type: 'string', example: 'Member' },
+              },
             },
-            username: { type: 'string', example: 'johndoe' },
-            displayName: { type: 'string', example: 'johndoe' },
-            email: { type: 'string', example: 'john.doe@example.com' },
-            websocketId: {
-              type: 'string',
-              example: '123e4567-e89b-12d3-a456-426614174001',
-            },
-            role: { type: 'string', example: 'Member' },
           },
         },
-      },
+        {
+          type: 'object',
+          properties: {
+            message: {
+              type: 'string',
+              example: 'Two-factor authentication required',
+            },
+            requiresTwoFactor: { type: 'boolean', example: true },
+            email: { type: 'string', example: 'john.doe@example.com' },
+          },
+        },
+      ],
     },
   })
   @ApiResponse({
@@ -303,6 +319,62 @@ export class AuthController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.authService.login(loginDto, request);
+  }
+
+  @Public()
+  @Throttle({ limit: RATE_LIMITS.LOGIN.LIMIT, ttl: RATE_LIMITS.LOGIN.TTL })
+  @Post('login/verify-2fa')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Verify 2FA code and complete login',
+    description:
+      'Verifies the 2FA code after initial login. Completes the authentication process and creates a session.',
+  })
+  @ApiBody({ type: VerifyLogin2faDto })
+  @ApiResponse({
+    status: 200,
+    description: '2FA verified and login successful',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Login successful' },
+        user: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'string',
+              example: '123e4567-e89b-12d3-a456-426614174000',
+            },
+            username: { type: 'string', example: 'johndoe' },
+            displayName: { type: 'string', example: 'johndoe' },
+            email: { type: 'string', example: 'john.doe@example.com' },
+            websocketId: {
+              type: 'string',
+              example: '123e4567-e89b-12d3-a456-426614174001',
+            },
+            role: { type: 'string', example: 'Member' },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - No pending login or email mismatch',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Invalid 2FA code',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'User not found',
+  })
+  async verifyLogin2fa(
+    @Body() verifyDto: VerifyLogin2faDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.authService.verifyLogin2fa(verifyDto, request);
   }
 
   @Post('logout')

@@ -10,12 +10,14 @@ import { Security } from './assets/entities/security/security.entity';
 import { Profile } from './assets/entities/profile.entity';
 import { PostsModule } from './services/posts/posts.module';
 import { FollowsModule } from './services/follows/follows.module';
+import { TwofaModule } from './security/twofa/twofa.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, Profile, Privacy, Security]),
     PostsModule,
     FollowsModule,
+    TwofaModule,
   ],
   controllers: [UsersController],
   providers: [UsersService],

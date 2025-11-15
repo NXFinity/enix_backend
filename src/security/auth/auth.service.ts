@@ -25,6 +25,8 @@ import {
   BCRYPT_SALT_ROUNDS,
   PASSWORD_RESET_TOKEN_EXPIRY_HOURS,
 } from '../../common/constants/app.constants';
+import { TwofaService } from '../../rest/api/users/security/twofa/twofa.service';
+import { VerifyTwoFactorDto } from '../../rest/api/users/security/twofa/assets/dto';
 
 // Enum
 import { ROLE } from '../roles/assets/enum/role.enum';
@@ -36,6 +38,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly emailService: EmailService,
     private readonly loggingService: LoggingService,
+    private readonly twofaService: TwofaService,
   ) {}
 
   // #########################################################
@@ -278,6 +281,55 @@ export class AuthService {
       }
     }
 
+    // Check if 2FA is enabled
+    if (user.security.isTwoFactorEnabled) {
+      // Store temporary login data in session (not authenticated yet)
+      if (request.session) {
+        request.session.pendingLogin = {
+          userId: user.id,
+          email: user.email,
+          passwordVerified: true,
+          createdAt: new Date(), // Timestamp for timeout checking
+        };
+      }
+
+      // Save session temporarily
+      if (request.session) {
+        await new Promise<void>((resolve, reject) => {
+          request.session!.save((err: any) => {
+            if (err) {
+              this.loggingService.error(
+                'Session save error',
+                err instanceof Error ? err.stack : undefined,
+                'AuthService',
+                {
+                  category: LogCategory.AUTHENTICATION,
+                  error: err instanceof Error ? err : new Error(String(err)),
+                  metadata: { userId: user.id, email: user.email },
+                },
+              );
+              reject(
+                new HttpException(
+                  'Failed to save session',
+                  HttpStatus.INTERNAL_SERVER_ERROR,
+                ),
+              );
+            } else {
+              resolve();
+            }
+          });
+        });
+      }
+
+      // Return requiresTwoFactor flag
+      return {
+        message: 'Two-factor authentication required',
+        requiresTwoFactor: true,
+        email: user.email,
+      };
+    }
+
+    // No 2FA - proceed with normal login
     // Store user in session (without password)
     const { password: _, security, ...userWithoutPassword } = user;
     if (request.session) {
@@ -300,6 +352,125 @@ export class AuthService {
       );
     }
 
+    await new Promise<void>((resolve, reject) => {
+      request.session!.save((err: any) => {
+        if (err) {
+          this.loggingService.error(
+            'Session save error',
+            err instanceof Error ? err.stack : undefined,
+            'AuthService',
+            {
+              category: LogCategory.AUTHENTICATION,
+              error: err instanceof Error ? err : new Error(String(err)),
+              metadata: { userId: user.id, email: user.email },
+            },
+          );
+          reject(
+            new HttpException(
+              'Failed to save session',
+              HttpStatus.INTERNAL_SERVER_ERROR,
+            ),
+          );
+        } else {
+          resolve();
+        }
+      });
+    });
+
+    return {
+      message: 'Login successful',
+      user: userWithoutPassword,
+    };
+  }
+
+  /**
+   * Verify 2FA code and complete login
+   */
+  async verifyLogin2fa(
+    verifyDto: { email: string; code: string },
+    request: AuthenticatedRequest,
+  ) {
+    const { email, code } = verifyDto;
+
+    // Check session for pending login
+    if (!request.session || !request.session.pendingLogin) {
+      throw new HttpException(
+        'No pending login found. Please login again.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const pendingLogin = request.session.pendingLogin;
+
+    // Check session timeout (5 minutes)
+    const PENDING_LOGIN_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+    if (
+      pendingLogin.createdAt &&
+      Date.now() - new Date(pendingLogin.createdAt).getTime() >
+        PENDING_LOGIN_TIMEOUT
+    ) {
+      delete request.session.pendingLogin;
+      throw new HttpException(
+        'Login session expired. Please login again.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Verify email matches
+    if (pendingLogin.email !== email) {
+      throw new HttpException(
+        'Email mismatch',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Find user
+    const user = await this.usersService.findUserWithSecurityByEmail(email);
+    if (!user || user.id !== pendingLogin.userId) {
+      throw new HttpException(
+        'User not found',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    // Verify 2FA is still enabled (prevent bypass)
+    if (!user.security || !user.security.isTwoFactorEnabled) {
+      delete request.session.pendingLogin;
+      throw new HttpException(
+        '2FA is no longer enabled. Please login again.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Verify 2FA code
+    const verifyTwoFactorDto: VerifyTwoFactorDto = { code };
+    try {
+      await this.twofaService.verifyTwoFactor(user.id, verifyTwoFactorDto);
+    } catch (error) {
+      throw new HttpException(
+        'Invalid 2FA code',
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+
+    // Clear pending login
+    delete request.session.pendingLogin;
+
+    // Store user in session (without password)
+    const { password: _, security, ...userWithoutPassword } = user;
+    if (request.session) {
+      request.session.user = {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        displayName: user.displayName,
+        role: user.role,
+        websocketId: user.websocketId,
+        isVerified: user.security.isVerified,
+      };
+    }
+
+    // Save session
     await new Promise<void>((resolve, reject) => {
       request.session!.save((err: any) => {
         if (err) {

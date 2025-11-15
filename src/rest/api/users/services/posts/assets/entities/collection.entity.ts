@@ -6,6 +6,7 @@ import { User } from '../../../../assets/entities/user.entity';
 @Entity('userPostCollection', { schema: 'account' })
 @Index(['userId', 'dateCreated'])
 @Index(['isPublic', 'dateCreated'])
+@Index(['userId', 'isPublic']) // Composite index for user's public/private collections
 export class Collection extends BaseEntity {
   @Column({ type: 'varchar', length: 200, nullable: false })
   name: string;

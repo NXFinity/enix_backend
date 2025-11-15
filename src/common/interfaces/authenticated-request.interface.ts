@@ -29,6 +29,15 @@ export interface AuthenticatedRequest extends Omit<Request, 'session' | 'user'> 
       websocketId: string;
       isVerified: boolean;
     };
+    /**
+     * Pending login data (for 2FA flow)
+     */
+    pendingLogin?: {
+      userId: string;
+      email: string;
+      passwordVerified: boolean;
+      createdAt: Date; // Timestamp for timeout checking
+    };
   };
 }
 

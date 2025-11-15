@@ -7,6 +7,7 @@ import { User } from '../../../../assets/entities/user.entity';
 @Unique(['userId', 'postId'])
 @Index(['userId', 'dateCreated'])
 @Index(['postId', 'dateCreated'])
+@Index(['userId', 'postId']) // Composite index for user-post lookups (already unique, but helps query performance)
 export class Bookmark extends BaseEntity {
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })

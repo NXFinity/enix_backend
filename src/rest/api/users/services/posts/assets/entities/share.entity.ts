@@ -6,6 +6,7 @@ import { User } from '../../../../assets/entities/user.entity';
 @Entity('userPostShare', { schema: 'account' })
 @Index(['postId', 'dateCreated'])
 @Index(['userId', 'dateCreated'])
+@Index(['userId', 'postId']) // Composite index for user-post lookups (prevents duplicate shares check)
 export class Share extends BaseEntity {
   // #########################################################
   // Share Content

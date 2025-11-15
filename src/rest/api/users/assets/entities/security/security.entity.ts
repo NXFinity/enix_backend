@@ -36,11 +36,17 @@ export class Security extends BaseEntity {
   @Column({ type: 'boolean', default: false })
   isTwoFactorEnabled: boolean;
   @Column({ type: 'varchar', nullable: true })
-  twoFactorSecret: string;
+  twoFactorSecret: string | null; // Encrypted TOTP secret
   @Column({ type: 'varchar', nullable: true })
-  twoFactorToken: string;
+  twoFactorToken: string | null; // Temporary token during setup
   @Column({ type: 'simple-array', nullable: true })
-  twoFactorBackupCodes: string[];
+  twoFactorBackupCodes: string[] | null; // Hashed backup codes
+  @Column({ type: 'timestamptz', nullable: true })
+  twoFactorEnabledAt: Date | null; // When 2FA was enabled
+  @Column({ type: 'timestamptz', nullable: true })
+  twoFactorLastVerified: Date | null; // Last time 2FA was verified
+  @Column({ type: 'timestamptz', nullable: true })
+  twoFactorBackupCodesGeneratedAt: Date | null; // When backup codes were generated
   // ########################################################
 
   // User Moderation - Bans

@@ -2200,6 +2200,20 @@ export class PostsService {
         throw new NotFoundException('Post not found');
       }
 
+      // Prevent self-reporting
+      if (post.userId === userId) {
+        throw new BadRequestException('You cannot report your own post');
+      }
+
+      // Check if user has already reported this post
+      const existingReport = await this.reportRepository.findOne({
+        where: { userId, postId },
+      });
+
+      if (existingReport) {
+        throw new BadRequestException('You have already reported this post');
+      }
+
       const report = this.reportRepository.create({
         userId,
         postId,
@@ -2474,6 +2488,7 @@ export class PostsService {
     postId: string,
   ): Promise<Collection> {
     try {
+      // Verify collection exists and user owns it
       const collection = await this.collectionRepository.findOne({
         where: { id: collectionId, userId },
         relations: ['posts'],
@@ -2483,6 +2498,7 @@ export class PostsService {
         throw new NotFoundException('Collection not found');
       }
 
+      // Verify post exists
       const post = await this.postRepository.findOne({
         where: { id: postId },
       });
@@ -2491,9 +2507,40 @@ export class PostsService {
         throw new NotFoundException('Post not found');
       }
 
+      // Verify post is not a draft (can't add drafts to collections)
+      if (post.isDraft) {
+        throw new BadRequestException('Cannot add draft posts to collections');
+      }
+
+      // Verify post is not archived (optional - can be added if needed)
+      if (post.isArchived) {
+        throw new BadRequestException('Cannot add archived posts to collections');
+      }
+
       // Check if post is already in collection
-      if (collection.posts.some((p) => p.id === postId)) {
+      const postAlreadyInCollection = collection.posts.some((p) => p.id === postId);
+      if (postAlreadyInCollection) {
         throw new BadRequestException('Post already in collection');
+      }
+
+      // Verify collection posts count matches actual posts (data integrity check)
+      const actualPostsCount = collection.posts.length;
+      if (collection.postsCount !== actualPostsCount) {
+        // Fix data inconsistency
+        this.loggingService.log(
+          'Collection posts count mismatch detected and corrected',
+          'PostsService',
+          {
+            category: LogCategory.DATABASE,
+            userId,
+            metadata: {
+              collectionId,
+              expectedCount: collection.postsCount,
+              actualCount: actualPostsCount,
+            },
+          },
+        );
+        collection.postsCount = actualPostsCount;
       }
 
       collection.posts.push(post);
@@ -2541,6 +2588,7 @@ export class PostsService {
     postId: string,
   ): Promise<void> {
     try {
+      // Verify collection exists and user owns it
       const collection = await this.collectionRepository.findOne({
         where: { id: collectionId, userId },
         relations: ['posts'],
@@ -2550,11 +2598,42 @@ export class PostsService {
         throw new NotFoundException('Collection not found');
       }
 
+      // Verify post exists in collection
+      const postInCollection = collection.posts.find((p) => p.id === postId);
+      if (!postInCollection) {
+        throw new NotFoundException('Post not found in collection');
+      }
+
+      // Verify collection posts count matches actual posts (data integrity check)
+      const actualPostsCount = collection.posts.length;
+      if (collection.postsCount !== actualPostsCount) {
+        // Fix data inconsistency
+        this.loggingService.log(
+          'Collection posts count mismatch detected and corrected',
+          'PostsService',
+          {
+            category: LogCategory.DATABASE,
+            userId,
+            metadata: {
+              collectionId,
+              expectedCount: collection.postsCount,
+              actualCount: actualPostsCount,
+            },
+          },
+        );
+        collection.postsCount = actualPostsCount;
+      }
+
       collection.posts = collection.posts.filter((p) => p.id !== postId);
       await this.collectionRepository.save(collection);
 
-      // Decrement collection posts count atomically
-      await this.collectionRepository.decrement({ id: collectionId }, 'postsCount', 1);
+      // Decrement collection posts count atomically (ensure it doesn't go below 0)
+      if (collection.postsCount > 0) {
+        await this.collectionRepository.decrement({ id: collectionId }, 'postsCount', 1);
+      } else {
+        // Reset to 0 if somehow negative
+        await this.collectionRepository.update({ id: collectionId }, { postsCount: 0 });
+      }
 
       this.loggingService.log('Post removed from collection', 'PostsService', {
         category: LogCategory.USER_MANAGEMENT,

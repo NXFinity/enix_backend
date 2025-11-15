@@ -10,6 +10,8 @@ import { User } from 'src/rest/api/users/assets/entities/user.entity';
 @Index(['postId', 'dateCreated'])
 @Index(['commentId', 'dateCreated'])
 @Index(['userId'])
+@Index(['userId', 'postId']) // Composite index for user-post lookups
+@Index(['userId', 'commentId']) // Composite index for user-comment lookups
 export class Like extends BaseEntity {
   // #########################################################
   // Like Type

@@ -1,9 +1,10 @@
-import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, Unique } from 'typeorm';
 import { BaseEntity } from '@database/database';
 import { Post } from './post.entity';
 import { User } from '../../../../assets/entities/user.entity';
 
 @Entity('userPostReport', { schema: 'account' })
+@Unique(['userId', 'postId']) // Prevent duplicate reports at database level
 @Index(['postId', 'dateCreated'])
 @Index(['userId', 'dateCreated'])
 @Index(['status', 'dateCreated'])
