@@ -1,18 +1,25 @@
 ---
 layout: default
+title: "Meta EN|IX API"
 ---
 
 # Meta EN|IX API
 
-**Version:** 1.3.0 | **Status:** ✅ Production Ready
+**Version:** `1.3.0`  
+**Status:** 🟢 **Production Ready**
 
-Welcome to the Meta EN|IX API documentation. Build applications that integrate with the Meta EN|IX platform.
+---
 
-## Quick Links
+Welcome to the **Meta EN|IX API**.  
+This documentation provides everything you need to build integrations, apps, and services using the Meta EN|IX platform.
 
-- [Getting Started](getting/getting-started.md) - Start building with our API
-- [API Reference](#) - Complete API documentation
-- [Changelogs](../docs/backend/changelogs/) - Version history
+---
+
+## ⚡ Quick Links
+
+- 👉 [Getting Started](/enix_backend/getting/getting-started.html)
+- 👉 [API Reference](/enix_backend/api/)
+- 👉 [Changelogs](/enix_backend/changelogs/)
 
 ---
 

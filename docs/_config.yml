@@ -1,65 +1,11 @@
-# ---------------------------------------------------
-# Basic Site Settings
-# ---------------------------------------------------
-title: "Meta EN|IX"
-description: "Official documentation and updates for the Meta EN|IX platform."
-url: "https://nxfinity.github.io"   # Replace with your GitHub Pages URL
-baseurl: ""                                 # Keep empty if using root of the repo
+title: "Meta EN|IX API"
+description: "Official API documentation for Meta EN|IX."
+theme: jekyll-theme-hacker
 
-# ---------------------------------------------------
-# Build Settings
-# ---------------------------------------------------
+url: "https://nxfinity.github.io"
+baseurl: "/enix_backend"
+
 markdown: kramdown
-theme: minima                                 # GitHub Pages–supported theme
 plugins:
   - jekyll-feed
   - jekyll-seo-tag
-
-# ---------------------------------------------------
-# Author Info
-# ---------------------------------------------------
-author:
-  name: "Matt"
-  email: "contact@metaenix.com"
-
-# ---------------------------------------------------
-# Social Links
-# ---------------------------------------------------
-social_links:
-  twitter: "https://twitter.com/meta_enix"
-  github: "https://github.com/NXFinity"
-
-# ---------------------------------------------------
-# Exclusions
-# ---------------------------------------------------
-exclude:
-  - node_modules
-  - Gemfile
-  - Gemfile.lock
-  - vendor
-
-# ---------------------------------------------------
-# Defaults for Pages & Posts
-# ---------------------------------------------------
-defaults:
-  - scope:
-      path: ""
-      type: "posts"
-    values:
-      layout: "post"
-      author: "Matt"
-
-  - scope:
-      path: ""
-      type: "pages"
-    values:
-      layout: "page"
-
-# ---------------------------------------------------
-# Feed & SEO
-# ---------------------------------------------------
-feed:
-  path: feed.xml
-
-seo:
-  name: "Meta EN|IX"
