@@ -5,7 +5,7 @@ description: API documentation for Meta EN|IX platform
 version: 1.3.0
 
 # Theme selection
-theme: jekyll-theme-cayman
+remote_theme: pages-themes/cayman@v0.2.0
 
 # Site settings
 baseurl: ""
@@ -20,6 +20,10 @@ kramdown:
 # Build settings
 sass:
   style: compressed
+
+# Plugins
+plugins:
+  - jekyll-remote-theme
 
 # GitHub Pages settings
 github: [metadata]
