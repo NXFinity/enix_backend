@@ -1,6 +1,7 @@
 title: "Meta EN|IX API"
 description: "Official API documentation for Meta EN|IX."
 theme: jekyll-theme-dinky
+remote_theme: pages-themes/dinky@v0.2.0
 
 url: "https://nxfinity.github.io"
 baseurl: "/enix_backend"
@@ -9,3 +10,4 @@ markdown: kramdown
 plugins:
   - jekyll-feed
   - jekyll-seo-tag
+  - jekyll-remote-theme
