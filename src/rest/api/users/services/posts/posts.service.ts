@@ -87,6 +87,25 @@ export class PostsService {
   }
 
   /**
+   * Validate and set parent post if provided
+   */
+  private async validateAndSetParentPost(
+    post: Post,
+    parentPostId: string,
+  ): Promise<void> {
+    const parentPost = await this.postRepository.findOne({
+      where: { id: parentPostId },
+    });
+
+    if (!parentPost) {
+      throw new NotFoundException('Parent post not found');
+    }
+
+    post.parentPost = parentPost;
+    post.parentPostId = parentPost.id;
+  }
+
+  /**
    * Determine post type based on media
    */
   private determinePostType(
@@ -210,18 +229,9 @@ export class PostsService {
         scheduledDate,
       });
 
-      // If parentPostId is provided, verify it exists
+      // Validate and set parent post if provided
       if (createPostDto.parentPostId) {
-        const parentPost = await this.postRepository.findOne({
-          where: { id: createPostDto.parentPostId },
-        });
-
-        if (!parentPost) {
-          throw new NotFoundException('Parent post not found');
-        }
-
-        post.parentPost = parentPost;
-        post.parentPostId = parentPost.id;
+        await this.validateAndSetParentPost(post, createPostDto.parentPostId);
       }
 
       const savedPost = await this.postRepository.save(post);
@@ -295,51 +305,18 @@ export class PostsService {
       // Sanitize content
       const sanitizedContent = sanitizeText(content);
 
-      // Upload media files (images, videos, GIFs)
-      const uploadedMediaUrls: string[] = [];
-      if (files && files.length > 0) {
-        for (const file of files) {
-          const uploadResult = await this.storageService.uploadFile(
-            userId,
-            file,
-            StorageType.MEDIA,
-            'post',
-          );
-          uploadedMediaUrls.push(uploadResult.url);
-        }
-      }
-
-      // Upload document files (PDF, Word, Excel, etc.)
-      const uploadedDocumentUrls: string[] = [];
-      if (documentFiles && documentFiles.length > 0) {
-        for (const file of documentFiles) {
-          const uploadResult = await this.storageService.uploadFile(
-            userId,
-            file,
-            StorageType.DOCUMENTS,
-          );
-          uploadedDocumentUrls.push(uploadResult.url);
-        }
-      }
-
-      // Combine all uploaded URLs
-      const allMediaUrls = [...uploadedMediaUrls, ...uploadedDocumentUrls];
-
       // Extract hashtags and mentions
       const hashtags = this.extractHashtags(sanitizedContent);
       const mentions = this.extractMentions(sanitizedContent);
-      const postType = this.determinePostType(
-        allMediaUrls.length > 0 ? allMediaUrls[0] : null,
-        allMediaUrls,
-      );
 
+      // Create post first (before uploading files)
       const post = this.postRepository.create({
         content: sanitizedContent,
-        mediaUrl: allMediaUrls.length > 0 ? allMediaUrls[0] : null,
-        mediaUrls: allMediaUrls,
+        mediaUrl: null,
+        mediaUrls: [],
         hashtags,
         mentions,
-        postType,
+        postType: 'text',
         userId,
         user,
         isPublic: options?.isPublic ?? true,
@@ -348,21 +325,87 @@ export class PostsService {
         parentPostId: options?.parentPostId,
       });
 
-      // If parentPostId is provided, verify it exists
+      // Validate and set parent post if provided
       if (options?.parentPostId) {
-        const parentPost = await this.postRepository.findOne({
-          where: { id: options.parentPostId },
-        });
-
-        if (!parentPost) {
-          throw new NotFoundException('Parent post not found');
-        }
-
-        post.parentPost = parentPost;
-        post.parentPostId = parentPost.id;
+        await this.validateAndSetParentPost(post, options.parentPostId);
       }
 
       const savedPost = await this.postRepository.save(post);
+
+      // Upload files after post creation (with rollback on failure)
+      const uploadedMediaUrls: string[] = [];
+      const uploadedDocumentUrls: string[] = [];
+      const uploadedFileKeys: string[] = [];
+
+      try {
+        // Upload media files (images, videos, GIFs)
+        if (files && files.length > 0) {
+          for (const file of files) {
+            const uploadResult = await this.storageService.uploadFile(
+              userId,
+              file,
+              StorageType.MEDIA,
+              'post',
+            );
+            uploadedMediaUrls.push(uploadResult.url);
+            uploadedFileKeys.push(uploadResult.key);
+          }
+        }
+
+        // Upload document files (PDF, Word, Excel, etc.)
+        if (documentFiles && documentFiles.length > 0) {
+          for (const file of documentFiles) {
+            const uploadResult = await this.storageService.uploadFile(
+              userId,
+              file,
+              StorageType.DOCUMENTS,
+            );
+            uploadedDocumentUrls.push(uploadResult.url);
+            uploadedFileKeys.push(uploadResult.key);
+          }
+        }
+
+        // Combine all uploaded URLs
+        const allMediaUrls = [...uploadedMediaUrls, ...uploadedDocumentUrls];
+
+        // Update post with file URLs and determine post type
+        savedPost.mediaUrl = allMediaUrls.length > 0 ? allMediaUrls[0] : null;
+        savedPost.mediaUrls = allMediaUrls;
+        savedPost.postType = this.determinePostType(
+          allMediaUrls.length > 0 ? allMediaUrls[0] : null,
+          allMediaUrls,
+        );
+
+        await this.postRepository.save(savedPost);
+      } catch (uploadError) {
+        // Rollback: Delete uploaded files and remove post
+        for (const fileKey of uploadedFileKeys) {
+          try {
+            await this.storageService.deleteFile(fileKey, userId);
+          } catch (deleteError) {
+            // Log but don't fail - file might not exist or already deleted
+            this.loggingService.error(
+              `Failed to delete uploaded file during rollback: ${fileKey}`,
+              deleteError instanceof Error ? deleteError.stack : undefined,
+              'PostsService',
+              {
+                category: LogCategory.STORAGE,
+                userId,
+                error:
+                  deleteError instanceof Error
+                    ? deleteError
+                    : new Error(String(deleteError)),
+              },
+            );
+          }
+        }
+
+        // Delete the post
+        await this.postRepository.remove(savedPost);
+
+        // Re-throw the upload error
+        throw uploadError;
+      }
 
       // Invalidate user's posts cache
       await this.cachingService.invalidateByTags(
@@ -478,9 +521,13 @@ export class PostsService {
             comment.parentComment = parentComment;
             comment.parentCommentId = parentComment.id;
 
-            // Increment parent comment replies count
-            parentComment.repliesCount += 1;
-            await transactionalEntityManager.save(Comment, parentComment);
+            // Increment parent comment replies count atomically
+            await transactionalEntityManager.increment(
+              Comment,
+              { id: createCommentDto.parentCommentId },
+              'repliesCount',
+              1,
+            );
           }
 
           const savedComment = await transactionalEntityManager.save(
@@ -488,9 +535,13 @@ export class PostsService {
             comment,
           );
 
-          // Increment post comments count
-          post.commentsCount += 1;
-          await transactionalEntityManager.save(Post, post);
+          // Increment post comments count atomically
+          await transactionalEntityManager.increment(
+            Post,
+            { id: postId },
+            'commentsCount',
+            1,
+          );
 
           return savedComment;
         },
@@ -622,17 +673,15 @@ export class PostsService {
 
       const savedLike = await this.likeRepository.save(like);
 
-      // Update counts
-      if (post) {
-        post.likesCount += 1;
-        await this.postRepository.save(post);
+      // Update counts atomically
+      if (postId) {
+        await this.postRepository.increment({ id: postId }, 'likesCount', 1);
         // Invalidate post cache
         await this.cachingService.invalidateByTags('post', `post:${postId}`);
       }
 
-      if (comment) {
-        comment.likesCount += 1;
-        await this.commentRepository.save(comment);
+      if (commentId) {
+        await this.commentRepository.increment({ id: commentId }, 'likesCount', 1);
         // Invalidate comment cache
         await this.cachingService.invalidateByTags(
           'comment',
@@ -703,32 +752,20 @@ export class PostsService {
 
       await this.likeRepository.remove(like);
 
-      // Update counts
+      // Update counts atomically
       if (postId) {
-        const post = await this.postRepository.findOne({
-          where: { id: postId },
-        });
-        if (post && post.likesCount > 0) {
-          post.likesCount -= 1;
-          await this.postRepository.save(post);
-          // Invalidate post cache
-          await this.cachingService.invalidateByTags('post', `post:${postId}`);
-        }
+        await this.postRepository.decrement({ id: postId }, 'likesCount', 1);
+        // Invalidate post cache
+        await this.cachingService.invalidateByTags('post', `post:${postId}`);
       }
 
       if (commentId) {
-        const comment = await this.commentRepository.findOne({
-          where: { id: commentId },
-        });
-        if (comment && comment.likesCount > 0) {
-          comment.likesCount -= 1;
-          await this.commentRepository.save(comment);
-          // Invalidate comment cache
-          await this.cachingService.invalidateByTags(
-            'comment',
-            `comment:${commentId}`,
-          );
-        }
+        await this.commentRepository.decrement({ id: commentId }, 'likesCount', 1);
+        // Invalidate comment cache
+        await this.cachingService.invalidateByTags(
+          'comment',
+          `comment:${commentId}`,
+        );
       }
 
       this.loggingService.log('Post/Comment unliked', 'PostsService', {
@@ -812,9 +849,8 @@ export class PostsService {
 
       const savedShare = await this.shareRepository.save(share);
 
-      // Increment post shares count
-      post.sharesCount += 1;
-      await this.postRepository.save(post);
+      // Increment post shares count atomically
+      await this.postRepository.increment({ id: postId }, 'sharesCount', 1);
 
       // Invalidate post cache
       await this.cachingService.invalidateByTags('post', `post:${postId}`);
@@ -1665,28 +1701,20 @@ export class PostsService {
       }
 
       const postId = comment.postId;
-
-      // If this is a reply, decrement parent comment replies count
-      if (comment.parentCommentId) {
-        const parentComment = await this.commentRepository.findOne({
-          where: { id: comment.parentCommentId },
-        });
-        if (parentComment && parentComment.repliesCount > 0) {
-          parentComment.repliesCount -= 1;
-          await this.commentRepository.save(parentComment);
-        }
-      }
+      const parentCommentId = comment.parentCommentId;
 
       await this.commentRepository.remove(comment);
 
-      // Decrement post comments count
-      const post = await this.postRepository.findOne({
-        where: { id: postId },
-      });
-      if (post && post.commentsCount > 0) {
-        post.commentsCount -= 1;
-        await this.postRepository.save(post);
+      // Decrement counts atomically
+      if (parentCommentId) {
+        await this.commentRepository.decrement(
+          { id: parentCommentId },
+          'repliesCount',
+          1,
+        );
       }
+
+      await this.postRepository.decrement({ id: postId }, 'commentsCount', 1);
 
       // Invalidate comment and post cache
       await this.cachingService.invalidateByTags(

@@ -8,6 +8,7 @@ import {
   Body,
   UnauthorizedException,
   UseGuards,
+  Res,
 } from '@nestjs/common';
 import {
   ApiOperation,
@@ -23,6 +24,7 @@ import { User } from '../../assets/entities/user.entity';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { Throttle } from '@throttle/throttle';
 import { AdminGuard } from 'src/security/auth/guards/admin.guard';
+import { Response } from 'express';
 
 @ApiTags('Account Management | Follows')
 @Controller('follows')
@@ -47,7 +49,6 @@ export class FollowsController {
     description: 'Bad request (already following or self-follow)',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden (privacy settings)' })
   @ApiResponse({ status: 404, description: 'User not found' })
   followUser(@CurrentUser() user: User, @Param('userId') userId: string) {
     const followerId = user?.id;
@@ -293,5 +294,164 @@ export class FollowsController {
       throw new UnauthorizedException('User ID not found');
     }
     return this.followsService.clearCooldown(followerId, followingId);
+  }
+
+  // #########################################################
+  // EXPORT ENDPOINTS
+  // #########################################################
+
+  @Get(':userId/followers/export')
+  @ApiOperation({ summary: 'Export followers list as CSV or JSON' })
+  @ApiParam({ name: 'userId', description: 'User ID' })
+  @ApiQuery({
+    name: 'format',
+    enum: ['csv', 'json'],
+    required: false,
+    description: 'Export format',
+    example: 'csv',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Followers exported successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async exportFollowers(
+    @CurrentUser() user: User,
+    @Param('userId') userId: string,
+    @Query('format') format: 'csv' | 'json' = 'csv',
+    @Res() res: Response,
+  ) {
+    const currentUserId = user?.id;
+    if (!currentUserId) {
+      throw new UnauthorizedException('User ID not found');
+    }
+    // Users can only export their own data
+    if (currentUserId !== userId) {
+      throw new UnauthorizedException('You can only export your own data');
+    }
+
+    const data = await this.followsService.exportFollowers(userId, format);
+
+    if (format === 'json') {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="followers-${userId}.json"`,
+      );
+    } else {
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="followers-${userId}.csv"`,
+      );
+    }
+
+    res.send(data);
+  }
+
+  @Get(':userId/following/export')
+  @ApiOperation({ summary: 'Export following list as CSV or JSON' })
+  @ApiParam({ name: 'userId', description: 'User ID' })
+  @ApiQuery({
+    name: 'format',
+    enum: ['csv', 'json'],
+    required: false,
+    description: 'Export format',
+    example: 'csv',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Following exported successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async exportFollowing(
+    @CurrentUser() user: User,
+    @Param('userId') userId: string,
+    @Query('format') format: 'csv' | 'json' = 'csv',
+    @Res() res: Response,
+  ) {
+    const currentUserId = user?.id;
+    if (!currentUserId) {
+      throw new UnauthorizedException('User ID not found');
+    }
+    // Users can only export their own data
+    if (currentUserId !== userId) {
+      throw new UnauthorizedException('You can only export your own data');
+    }
+
+    const data = await this.followsService.exportFollowing(userId, format);
+
+    if (format === 'json') {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="following-${userId}.json"`,
+      );
+    } else {
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="following-${userId}.csv"`,
+      );
+    }
+
+    res.send(data);
+  }
+
+  // #########################################################
+  // ENHANCED ANALYTICS ENDPOINTS
+  // #########################################################
+
+  @Get(':userId/analytics/enhanced')
+  @ApiOperation({ summary: 'Get enhanced follow analytics with growth trends' })
+  @ApiParam({ name: 'userId', description: 'User ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Enhanced analytics retrieved successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  getEnhancedFollowAnalytics(
+    @CurrentUser() user: User,
+    @Param('userId') userId: string,
+  ) {
+    const currentUserId = user?.id;
+    if (!currentUserId) {
+      throw new UnauthorizedException('User ID not found');
+    }
+    // Users can only view their own analytics
+    if (currentUserId !== userId) {
+      throw new UnauthorizedException('You can only view your own analytics');
+    }
+    return this.followsService.getEnhancedFollowAnalytics(userId);
+  }
+
+  @Get(':userId/history')
+  @ApiOperation({ summary: 'Get follow history/audit log' })
+  @ApiParam({ name: 'userId', description: 'User ID' })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 50 })
+  @ApiResponse({
+    status: 200,
+    description: 'Follow history retrieved successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  getFollowHistory(
+    @CurrentUser() user: User,
+    @Param('userId') userId: string,
+    @Query() paginationDto: PaginationDto,
+  ) {
+    const currentUserId = user?.id;
+    if (!currentUserId) {
+      throw new UnauthorizedException('User ID not found');
+    }
+    // Users can only view their own history
+    if (currentUserId !== userId) {
+      throw new UnauthorizedException('You can only view your own history');
+    }
+    return this.followsService.getFollowHistory(userId, paginationDto);
   }
 }

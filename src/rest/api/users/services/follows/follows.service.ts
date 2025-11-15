@@ -6,10 +6,15 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, MoreThanOrEqual } from 'typeorm';
+import {
+  Repository,
+  In,
+  MoreThanOrEqual,
+  LessThanOrEqual,
+  Between,
+} from 'typeorm';
 import { Follow } from './assets/entities/follow.entity';
 import { User } from '../../assets/entities/user.entity';
-import { Privacy } from '../../assets/entities/security/privacy.entity';
 import { LoggingService } from '@logging/logging';
 import { LogCategory } from '@logging/logging';
 import { AuditLogService } from '@logging/logging';
@@ -31,8 +36,6 @@ export class FollowsService {
     private readonly followRepository: Repository<Follow>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    @InjectRepository(Privacy)
-    private readonly privacyRepository: Repository<Privacy>,
     private readonly loggingService: LoggingService,
     private readonly auditLogService: AuditLogService,
     private readonly cachingService: CachingService,
@@ -66,10 +69,7 @@ export class FollowsService {
       // Verify both users exist
       const [follower, following] = await Promise.all([
         this.userRepository.findOne({ where: { id: followerId } }),
-        this.userRepository.findOne({
-          where: { id: followingId },
-          relations: ['privacy'],
-        }),
+        this.userRepository.findOne({ where: { id: followingId } }),
       ]);
 
       if (!follower) {
@@ -78,15 +78,6 @@ export class FollowsService {
 
       if (!following) {
         throw new NotFoundException('User to follow not found');
-      }
-
-      // Check privacy settings
-      if (following.privacy) {
-        if (!following.privacy.allowFriendRequests) {
-          throw new ForbiddenException(
-            'This user does not allow friend requests',
-          );
-        }
       }
 
       // Check cooldown period (prevent follow/unfollow spam)
@@ -124,10 +115,10 @@ export class FollowsService {
         `user:${followerId}:following`,
         `user:${followingId}:followers`,
       );
-      
+
       // Invalidate specific follow status cache
       await this.redisService.del(`follow:status:${followerId}:${followingId}`);
-      
+
       // Invalidate suggestions cache
       await this.redisService.del(`follow:suggestions:${followerId}`);
 
@@ -200,7 +191,7 @@ export class FollowsService {
         `user:${followerId}:following`,
         `user:${followingId}:followers`,
       );
-      
+
       // Invalidate specific follow status cache
       await this.redisService.del(`follow:status:${followerId}:${followingId}`);
 
@@ -248,7 +239,7 @@ export class FollowsService {
   async isFollowing(followerId: string, followingId: string): Promise<boolean> {
     try {
       const cacheKey = `follow:status:${followerId}:${followingId}`;
-      
+
       // Try to get from cache first
       const cached = await this.cachingService.get<boolean>(cacheKey);
       if (cached !== null) {
@@ -343,7 +334,11 @@ export class FollowsService {
             isFollowing,
             {
               ttl: 300,
-              tags: [`user:${followerId}`, `user:${userId}`, `user:${followerId}:following`],
+              tags: [
+                `user:${followerId}`,
+                `user:${userId}`,
+                `user:${followerId}:following`,
+              ],
             },
           );
         }
@@ -363,7 +358,9 @@ export class FollowsService {
         },
       );
 
-      throw new InternalServerErrorException('Failed to batch check follow status');
+      throw new InternalServerErrorException(
+        'Failed to batch check follow status',
+      );
     }
   }
 
@@ -376,10 +373,11 @@ export class FollowsService {
     paginationDto: PaginationDto & { search?: string } = {},
   ): Promise<
     PaginationResponse<
-      User & { isFollowing: boolean; isFollowedBack?: boolean; mutualFollowsCount?: number } & Record<
-          string,
-          any
-        >
+      User & {
+        isFollowing: boolean;
+        isFollowedBack?: boolean;
+        mutualFollowsCount?: number;
+      } & Record<string, any>
     >
   > {
     try {
@@ -454,11 +452,11 @@ export class FollowsService {
       // Check if current user is being followed back (mutual follow detection)
       // Only show mutual follow status if viewing own following list
       let mutualFollows: Set<string> = new Set();
-      let mutualFollowsCounts: Map<string, number> = new Map();
-      
+      const mutualFollowsCounts: Map<string, number> = new Map();
+
       if (users.length > 0) {
         const userIds = users.map((u) => u.id);
-        
+
         // Get mutual follows for current user (if viewing own list)
         if (currentUserId === userId) {
           const mutualFollowsData = await this.followRepository.find({
@@ -483,7 +481,7 @@ export class FollowsService {
 
           if (currentUserFollowingIds.length > 0) {
             const targetUserIds = users.map((u) => u.id);
-            
+
             // Batch query: get all follows from currentUserFollowingIds to targetUserIds
             const mutualConnectionsData = await this.followRepository
               .createQueryBuilder('follow')
@@ -572,7 +570,12 @@ export class FollowsService {
     currentUserId?: string,
     paginationDto: PaginationDto & { search?: string } = {},
   ): Promise<
-    PaginationResponse<User & { isFollowing: boolean; mutualFollowsCount?: number } & Record<string, any>>
+    PaginationResponse<
+      User & { isFollowing: boolean; mutualFollowsCount?: number } & Record<
+          string,
+          any
+        >
+    >
   > {
     try {
       const user = await this.userRepository.findOne({
@@ -645,6 +648,8 @@ export class FollowsService {
 
       // Check if current user is following each follower (for mutual follow detection)
       let currentUserFollowing: Set<string> = new Set();
+      const mutualFollowsCounts: Map<string, number> = new Map();
+
       if (currentUserId && followers.length > 0) {
         const followerIds = followers.map((f) => f.id);
         const currentUserFollows = await this.followRepository.find({
@@ -656,15 +661,60 @@ export class FollowsService {
         currentUserFollowing = new Set(
           currentUserFollows.map((f) => f.followingId),
         );
+
+        // Calculate mutual follow counts for each follower
+        // Count how many of the current user's following also follow each follower
+        const currentUserFollowingList = await this.followRepository.find({
+          where: { followerId: currentUserId },
+          select: ['followingId'],
+        });
+        const currentUserFollowingIds = Array.from(
+          new Set(currentUserFollowingList.map((f) => f.followingId)),
+        );
+
+        if (currentUserFollowingIds.length > 0) {
+          // Batch query: get all follows from currentUserFollowingIds to followerIds
+          const mutualConnectionsData = await this.followRepository
+            .createQueryBuilder('follow')
+            .where('follow.followerId IN (:...followingIds)', {
+              followingIds: currentUserFollowingIds,
+            })
+            .andWhere('follow.followingId IN (:...followerIds)', {
+              followerIds,
+            })
+            .select(['follow.followerId', 'follow.followingId'])
+            .getMany();
+
+          // Count mutual connections per follower
+          const connectionCounts = new Map<string, number>();
+          for (const connection of mutualConnectionsData) {
+            const count = connectionCounts.get(connection.followingId) || 0;
+            connectionCounts.set(connection.followingId, count + 1);
+          }
+
+          // Set mutual follow counts
+          for (const follower of followers) {
+            mutualFollowsCounts.set(
+              follower.id,
+              connectionCounts.get(follower.id) || 0,
+            );
+          }
+        }
       }
 
-      // Add isFollowing flag
+      // Add isFollowing flag and mutualFollowsCount
       const followersWithFollowing = followers.map((follower) => ({
         ...follower,
         isFollowing: currentUserId
           ? currentUserFollowing.has(follower.id)
           : false,
-      })) as (User & { isFollowing: boolean } & Record<string, any>)[];
+        ...(currentUserId && {
+          mutualFollowsCount: mutualFollowsCounts.get(follower.id) || 0,
+        }),
+      })) as (User & {
+        isFollowing: boolean;
+        mutualFollowsCount?: number;
+      } & Record<string, any>)[];
 
       const totalPages = Math.ceil(total / limit);
       const meta: PaginationMeta = {
@@ -871,7 +921,9 @@ export class FollowsService {
         },
       );
 
-      throw new InternalServerErrorException('Failed to get follow suggestions');
+      throw new InternalServerErrorException(
+        'Failed to get follow suggestions',
+      );
     }
   }
 
@@ -885,7 +937,11 @@ export class FollowsService {
     newFollowersLast30Days: number;
     unfollowsLast7Days: number;
     unfollowsLast30Days: number;
-    topFollowers: Array<{ userId: string; username: string; displayName: string }>;
+    topFollowers: Array<{
+      userId: string;
+      username: string;
+      displayName: string;
+    }>;
   }> {
     try {
       const user = await this.userRepository.findOne({
@@ -997,10 +1053,7 @@ export class FollowsService {
   /**
    * Clear cooldown for a specific follow relationship (admin only)
    */
-  async clearCooldown(
-    followerId: string,
-    followingId: string,
-  ): Promise<void> {
+  async clearCooldown(followerId: string, followingId: string): Promise<void> {
     try {
       const cooldownKey = `follow:cooldown:${followerId}:${followingId}`;
       await this.redisService.del(cooldownKey);
@@ -1026,5 +1079,427 @@ export class FollowsService {
       throw new InternalServerErrorException('Failed to clear cooldown');
     }
   }
-}
 
+  // #########################################################
+  // EXPORT FUNCTIONALITY
+  // #########################################################
+
+  /**
+   * Export followers list as CSV or JSON
+   */
+  async exportFollowers(
+    userId: string,
+    format: 'csv' | 'json' = 'csv',
+  ): Promise<string> {
+    try {
+      const follows = await this.followRepository.find({
+        where: { followingId: userId },
+        relations: ['follower', 'follower.profile'],
+        order: { dateCreated: 'DESC' },
+      });
+
+      if (format === 'json') {
+        return JSON.stringify(
+          follows.map((f) => ({
+            userId: f.follower.id,
+            username: f.follower.username,
+            displayName: f.follower.displayName,
+            email: f.follower.email,
+            followedAt: f.dateCreated.toISOString(),
+            bio: f.follower.profile?.bio || '',
+            avatar: f.follower.profile?.avatar || '',
+          })),
+          null,
+          2,
+        );
+      }
+
+      // CSV format
+      const headers = [
+        'User ID',
+        'Username',
+        'Display Name',
+        'Email',
+        'Followed At',
+        'Bio',
+        'Avatar URL',
+      ];
+      const rows = follows.map((f) => [
+        f.follower.id,
+        f.follower.username,
+        f.follower.displayName || '',
+        f.follower.email || '',
+        f.dateCreated.toISOString(),
+        (f.follower.profile?.bio || '').replace(/"/g, '""'), // Escape quotes
+        f.follower.profile?.avatar || '',
+      ]);
+
+      const csvRows = [
+        headers.map((h) => `"${h}"`).join(','),
+        ...rows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
+      ];
+
+      return csvRows.join('\n');
+    } catch (error) {
+      this.loggingService.error(
+        'Error exporting followers',
+        error instanceof Error ? error.stack : undefined,
+        'FollowsService',
+        {
+          category: LogCategory.DATABASE,
+          userId,
+          error: error instanceof Error ? error : new Error(String(error)),
+        },
+      );
+
+      throw new InternalServerErrorException('Failed to export followers');
+    }
+  }
+
+  /**
+   * Export following list as CSV or JSON
+   */
+  async exportFollowing(
+    userId: string,
+    format: 'csv' | 'json' = 'csv',
+  ): Promise<string> {
+    try {
+      const follows = await this.followRepository.find({
+        where: { followerId: userId },
+        relations: ['following', 'following.profile'],
+        order: { dateCreated: 'DESC' },
+      });
+
+      if (format === 'json') {
+        return JSON.stringify(
+          follows.map((f) => ({
+            userId: f.following.id,
+            username: f.following.username,
+            displayName: f.following.displayName,
+            email: f.following.email,
+            followedAt: f.dateCreated.toISOString(),
+            bio: f.following.profile?.bio || '',
+            avatar: f.following.profile?.avatar || '',
+          })),
+          null,
+          2,
+        );
+      }
+
+      // CSV format
+      const headers = [
+        'User ID',
+        'Username',
+        'Display Name',
+        'Email',
+        'Followed At',
+        'Bio',
+        'Avatar URL',
+      ];
+      const rows = follows.map((f) => [
+        f.following.id,
+        f.following.username,
+        f.following.displayName || '',
+        f.following.email || '',
+        f.dateCreated.toISOString(),
+        (f.following.profile?.bio || '').replace(/"/g, '""'), // Escape quotes
+        f.following.profile?.avatar || '',
+      ]);
+
+      const csvRows = [
+        headers.map((h) => `"${h}"`).join(','),
+        ...rows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
+      ];
+
+      return csvRows.join('\n');
+    } catch (error) {
+      this.loggingService.error(
+        'Error exporting following',
+        error instanceof Error ? error.stack : undefined,
+        'FollowsService',
+        {
+          category: LogCategory.DATABASE,
+          userId,
+          error: error instanceof Error ? error : new Error(String(error)),
+        },
+      );
+
+      throw new InternalServerErrorException('Failed to export following');
+    }
+  }
+
+  // #########################################################
+  // ENHANCED ANALYTICS
+  // #########################################################
+
+  /**
+   * Get enhanced follow analytics with growth trends
+   */
+  async getEnhancedFollowAnalytics(userId: string): Promise<{
+    totalFollowers: number;
+    totalFollowing: number;
+    newFollowersLast7Days: number;
+    newFollowersLast30Days: number;
+    unfollowsLast7Days: number;
+    unfollowsLast30Days: number;
+    topFollowers: Array<{
+      userId: string;
+      username: string;
+      displayName: string;
+    }>;
+    growthTrends: {
+      daily: Array<{ date: string; followers: number; following: number }>;
+      weekly: Array<{ week: string; followers: number; following: number }>;
+    };
+    engagementMetrics: {
+      averageFollowersPerDay: number;
+      averageFollowingPerDay: number;
+      followerRetentionRate: number; // Percentage of followers who remain after 30 days
+    };
+  }> {
+    try {
+      const user = await this.userRepository.findOne({
+        where: { id: userId },
+      });
+
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+
+      const now = new Date();
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+
+      // Get basic analytics
+      const basicAnalytics = await this.getFollowAnalytics(userId);
+
+      // Get daily growth trends for last 30 days
+      const dailyTrends: Array<{
+        date: string;
+        followers: number;
+        following: number;
+      }> = [];
+      for (let i = 29; i >= 0; i--) {
+        const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+        const dateStart = new Date(date);
+        dateStart.setHours(0, 0, 0, 0);
+        const dateEnd = new Date(date);
+        dateEnd.setHours(23, 59, 59, 999);
+
+        const [followersCount, followingCount] = await Promise.all([
+          this.followRepository.count({
+            where: {
+              followingId: userId,
+              dateCreated: Between(dateStart, dateEnd),
+            },
+          }),
+          this.followRepository.count({
+            where: {
+              followerId: userId,
+              dateCreated: Between(dateStart, dateEnd),
+            },
+          }),
+        ]);
+
+        dailyTrends.push({
+          date: dateStart.toISOString().split('T')[0],
+          followers: followersCount,
+          following: followingCount,
+        });
+      }
+
+      // Get weekly growth trends for last 12 weeks
+      const weeklyTrends: Array<{
+        week: string;
+        followers: number;
+        following: number;
+      }> = [];
+      for (let i = 11; i >= 0; i--) {
+        const weekStart = new Date(now.getTime() - i * 7 * 24 * 60 * 60 * 1000);
+        weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // Start of week (Sunday)
+        weekStart.setHours(0, 0, 0, 0);
+        const weekEnd = new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000);
+        weekEnd.setHours(23, 59, 59, 999);
+
+        const [followersCount, followingCount] = await Promise.all([
+          this.followRepository.count({
+            where: {
+              followingId: userId,
+              dateCreated: Between(weekStart, weekEnd),
+            },
+          }),
+          this.followRepository.count({
+            where: {
+              followerId: userId,
+              dateCreated: Between(weekStart, weekEnd),
+            },
+          }),
+        ]);
+
+        weeklyTrends.push({
+          week: `${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`,
+          followers: followersCount,
+          following: followingCount,
+        });
+      }
+
+      // Calculate engagement metrics
+      const totalDays = 30;
+      const averageFollowersPerDay =
+        basicAnalytics.newFollowersLast30Days / totalDays;
+      const averageFollowingPerDay = basicAnalytics.totalFollowing / totalDays;
+
+      // Calculate follower retention rate (followers who followed 30+ days ago and still follow)
+      const oldFollowers = await this.followRepository.count({
+        where: {
+          followingId: userId,
+          dateCreated: MoreThanOrEqual(ninetyDaysAgo),
+        },
+      });
+
+      const currentFollowers = user.followersCount || 0;
+      const followerRetentionRate =
+        oldFollowers > 0 ? (currentFollowers / oldFollowers) * 100 : 100;
+
+      return {
+        ...basicAnalytics,
+        growthTrends: {
+          daily: dailyTrends,
+          weekly: weeklyTrends,
+        },
+        engagementMetrics: {
+          averageFollowersPerDay:
+            Math.round(averageFollowersPerDay * 100) / 100,
+          averageFollowingPerDay:
+            Math.round(averageFollowingPerDay * 100) / 100,
+          followerRetentionRate: Math.round(followerRetentionRate * 100) / 100,
+        },
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+
+      this.loggingService.error(
+        'Error getting enhanced follow analytics',
+        error instanceof Error ? error.stack : undefined,
+        'FollowsService',
+        {
+          category: LogCategory.DATABASE,
+          userId,
+          error: error instanceof Error ? error : new Error(String(error)),
+        },
+      );
+
+      throw new InternalServerErrorException(
+        'Failed to get enhanced follow analytics',
+      );
+    }
+  }
+
+  /**
+   * Get follow history/audit log
+   */
+  async getFollowHistory(
+    userId: string,
+    paginationDto: PaginationDto = {},
+  ): Promise<
+    PaginationResponse<{
+      type: 'follow' | 'unfollow';
+      targetUserId: string;
+      targetUsername: string;
+      timestamp: Date;
+      metadata?: Record<string, any>;
+    }>
+  > {
+    try {
+      const page = paginationDto.page || 1;
+      const limit = paginationDto.limit || 50;
+      const skip = (page - 1) * limit;
+
+      // Get follow events from audit logs
+      const followLogs = await this.auditLogService.findWithFilters({
+        userId,
+        category: LogCategory.USER_MANAGEMENT,
+        startDate: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000), // Last 90 days
+        limit: 1000,
+      });
+
+      // Combine and format history
+      const history: Array<{
+        type: 'follow' | 'unfollow';
+        targetUserId: string;
+        targetUsername: string;
+        timestamp: Date;
+        metadata?: Record<string, any>;
+      }> = [];
+
+      // Process audit logs
+      for (const log of followLogs) {
+        if (
+          log.metadata &&
+          typeof log.metadata === 'object' &&
+          (log.metadata.action === 'follow' ||
+            log.metadata.action === 'unfollow' ||
+            log.metadata.followingId ||
+            log.metadata.followerId)
+        ) {
+          const metadata = log.metadata;
+          const targetUserId =
+            metadata.followingId || metadata.followerId;
+
+          if (targetUserId) {
+            const targetUser = await this.userRepository.findOne({
+              where: { id: targetUserId },
+              select: ['id', 'username', 'displayName'],
+            });
+
+            history.push({
+              type: metadata.action === 'unfollow' ? 'unfollow' : 'follow',
+              targetUserId,
+              targetUsername: targetUser?.username || 'Unknown',
+              timestamp: log.dateCreated,
+              metadata: {
+                logId: log.id,
+                ...metadata,
+              },
+            });
+          }
+        }
+      }
+
+      // Sort by timestamp (newest first) and paginate
+      history.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+      const paginatedHistory = history.slice(skip, skip + limit);
+
+      const totalPages = Math.ceil(history.length / limit);
+      const meta: PaginationMeta = {
+        page,
+        limit,
+        total: history.length,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      };
+
+      return {
+        data: paginatedHistory,
+        meta,
+      };
+    } catch (error) {
+      this.loggingService.error(
+        'Error getting follow history',
+        error instanceof Error ? error.stack : undefined,
+        'FollowsService',
+        {
+          category: LogCategory.DATABASE,
+          userId,
+          error: error instanceof Error ? error : new Error(String(error)),
+        },
+      );
+
+      throw new InternalServerErrorException('Failed to get follow history');
+    }
+  }
+}
