@@ -1,19 +1,15 @@
-# Backend Changelog
+# Backend Changelog - 15/11/2025
 
-All notable changes to the backend codebase will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+**Date:** 15/11/2025 19:00 GMT  
+**Year:** 2025
 
 ---
 
-## [Unreleased]
+## Critical Bug Fixes
 
-### Fixed - 15/01/2025 14:30 GMT
+### Follow System - Removed Incorrect Follow Request Implementation
+**Time:** 19:00 GMT
 
-#### Critical Bug Fixes
-
-##### Follow System - Removed Incorrect Follow Request Implementation
 - **Fixed:** Removed incorrect "Follow Request" system that was treating follows as friend requests
 - **Changed:** Follow system now works as direct, one-way relationship (no approval required)
 - **Files Modified:**
@@ -35,7 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `backend/src/rest/api/users/services/follows/assets/dto/create-follow-request.dto.ts`
 - **Impact:** Follow system now correctly implements direct following without approval workflow
 
-##### Race Conditions - Fixed All Non-Atomic Count Updates
+### Race Conditions - Fixed All Non-Atomic Count Updates
+**Time:** 19:00 GMT
+
 - **Fixed:** Replaced all non-atomic count updates with atomic `increment()`/`decrement()` operations
 - **Changed:** All count field updates now use database-level atomic operations
 - **Files Modified:**
@@ -56,7 +54,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `removePostFromCollection()` - Line 2557: Changed from `collection.postsCount = Math.max(0, collection.postsCount - 1)` to `await this.collectionRepository.decrement({ id: collectionId }, 'postsCount', 1)`
 - **Impact:** Prevents race conditions and ensures data consistency under concurrent load
 
-##### File Upload Rollback - Fixed Orphaned Files Issue
+### File Upload Rollback - Fixed Orphaned Files Issue
+**Time:** 19:00 GMT
+
 - **Fixed:** Implemented proper rollback mechanism for file uploads in `createPostWithFiles()`
 - **Changed:** Post creation now happens before file uploads, with rollback on failure
 - **Files Modified:**
@@ -66,9 +66,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Prevents orphaned files in storage when post creation fails after file upload
 - **Impact:** Prevents orphaned files in storage and ensures data consistency
 
-#### Code Quality Improvements
+---
 
-##### Code Duplication - Extracted Parent Post Validation
+## Code Quality Improvements
+
+### Code Duplication - Extracted Parent Post Validation
+**Time:** 19:00 GMT
+
 - **Fixed:** Removed duplicate parent post validation logic
 - **Changed:** Extracted validation into reusable helper method
 - **Files Modified:**
@@ -78,7 +82,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Updated `createPostWithFiles()` to use helper method - Line 330
 - **Impact:** Improved code maintainability and reduced duplication
 
-##### Unused Imports - Cleaned Up
+### Unused Imports - Cleaned Up
+**Time:** 19:00 GMT
+
 - **Fixed:** Removed unused imports and dependencies
 - **Files Modified:**
   - `backend/src/rest/api/users/services/follows/follows.service.ts`
@@ -89,9 +95,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Removed unused `CreateFollowRequestDto` import
 - **Impact:** Cleaner codebase, reduced bundle size
 
-#### Controller Fixes
+---
 
-##### Export Endpoints - Fixed Compilation Errors
+## Controller Fixes
+
+### Export Endpoints - Fixed Compilation Errors
+**Time:** 19:00 GMT
+
 - **Fixed:** Added missing imports for export functionality
 - **Files Modified:**
   - `backend/src/rest/api/users/services/follows/follows.controller.ts`
@@ -101,7 +111,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## Summary of Changes
+## Summary
 
 ### Statistics
 - **Files Modified:** 4
@@ -126,10 +136,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## Notes
-
-- All date/time stamps are in UK/EU format (DD/MM/YYYY HH:MM GMT)
-- All changes have been verified through static code analysis
-- Runtime testing recommended before production deployment
-- See `docs/backend/AUDIT_REPORT.md` for detailed audit findings
+**Note:** All date/time stamps are in UK/EU format (DD/MM/YYYY HH:MM GMT)
 
