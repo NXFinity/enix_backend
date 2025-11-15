@@ -3,7 +3,7 @@
 # ---------------------------------------------------
 title: "Meta EN|IX"
 description: "Official documentation and updates for the Meta EN|IX platform."
-url: "https://<your-username>.github.io"   # Replace with your GitHub Pages URL
+url: "https://nxfinity.github.io"   # Replace with your GitHub Pages URL
 baseurl: ""                                 # Keep empty if using root of the repo
 
 # ---------------------------------------------------
@@ -26,8 +26,8 @@ author:
 # Social Links
 # ---------------------------------------------------
 social_links:
-  twitter: "https://twitter.com/metaenix"
-  github: "https://github.com/<your-username>"
+  twitter: "https://twitter.com/meta_enix"
+  github: "https://github.com/NXFinity"
 
 # ---------------------------------------------------
 # Exclusions
