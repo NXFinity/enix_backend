@@ -6,15 +6,14 @@ version: 1.3.0
 
 # Theme selection
 # Choose from: jekyll-theme-minimal, jekyll-theme-cayman, jekyll-theme-dinky, etc.
-# Or use remote_theme for custom themes
 theme: jekyll-theme-minimal
 
-# Or use a remote theme from GitHub:
-# remote_theme: pages-themes/minimal
-
 # Site settings
+# Update baseurl based on your repository structure
+# If docs folder is at root: baseurl: ""
+# If docs folder is in backend: baseurl: "/backend/docs"
 baseurl: "/backend/docs"
-url: "https://your-username.github.io" # Replace with your GitHub Pages URL
+url: "" # Leave empty for GitHub Pages auto-detection
 
 # Navigation
 navigation:

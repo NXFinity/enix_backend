@@ -1,3 +1,10 @@
+---
+layout: default
+title: Meta EN|IX Backend
+description: Production-ready NestJS backend for Meta EN|IX social platform
+version: 1.3.0
+---
+
 # Meta EN|IX Backend
 
 **Version:** 1.3.0  
