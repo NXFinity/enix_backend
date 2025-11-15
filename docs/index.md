@@ -8,9 +8,6 @@ title: "Meta EN|IX API"
 Version: **1.3.0**  
 Status: 🟢 **Production Ready**
 
-Welcome to the Meta EN|IX API documentation.  
-This site provides the essential guides, references, and changelogs for building integrations, apps, and services with the Meta EN|IX platform.
-
 ## ⚡ Quick Links
 
 - 👉 [Getting Started](/enix_backend/getting/)
