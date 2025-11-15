@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 # Meta EN|IX API
 
 **Version:** 1.3.0 | **Status:** ✅ Production Ready
