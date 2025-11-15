@@ -64,4 +64,11 @@ export class User extends BaseEntity {
 
   @OneToMany(() => Share, (share) => share.user, { onDelete: 'CASCADE' })
   shares: Share[];
+
+  // Follow relationships
+  @Column({ type: 'int', default: 0 })
+  followersCount: number;
+
+  @Column({ type: 'int', default: 0 })
+  followingCount: number;
 }

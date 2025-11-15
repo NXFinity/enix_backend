@@ -1,6 +1,6 @@
 # Meta EN|IX Backend
 
-**Version:** Alpha 1.0.0  
+**Version:** Alpha 1.1.0  
 **Framework:** NestJS v11.0.1  
 **Database:** PostgreSQL with TypeORM  
 **Status:** ✅ Production Ready

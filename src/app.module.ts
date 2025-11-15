@@ -12,6 +12,7 @@ import { SessionStoreConfig } from './config/session-store.config';
 import { HealthModule } from './services/health/health.module';
 import { StartupModule } from './services/startup/startup.module';
 import { StorageModule } from './rest/storage/storage.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 // Validation
 import * as Joi from 'joi';
@@ -23,6 +24,7 @@ import { ThrottleGuard } from '@throttle/throttle';
 
 @Module({
   imports: [
+    EventEmitterModule.forRoot(),
     ConfigModule.forRoot({
       envFilePath: ['.env.development'],
       isGlobal: true,

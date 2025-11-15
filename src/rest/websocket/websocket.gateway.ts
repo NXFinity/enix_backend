@@ -15,7 +15,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { WebsocketService } from './websocket.service';
-import { UsersService } from '../../rest/api/users/users.service';
+import { UsersService } from '../api/users/users.service';
 import { LoggingService } from '@logging/logging';
 import { LogCategory } from '@logging/logging';
 import * as session from 'express-session';

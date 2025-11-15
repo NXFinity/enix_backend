@@ -13,10 +13,12 @@ export class Privacy extends BaseEntity {
 
   @Column({ type: 'boolean', default: false })
   allowMessages: boolean;
-  @Column({ type: 'boolean', default: false })
+  @Column({ type: 'boolean', default: true })
   allowNotifications: boolean;
   @Column({ type: 'boolean', default: false })
   allowFriendRequests: boolean;
+  @Column({ type: 'boolean', default: true })
+  notifyOnFollow: boolean;
 
   @OneToOne(() => User, (user) => user.privacy, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'privacyId' })

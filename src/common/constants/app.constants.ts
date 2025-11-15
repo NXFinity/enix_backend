@@ -80,6 +80,16 @@ export const RATE_LIMITS = {
 } as const;
 
 // ============================================
+// FOLLOW COOLDOWN CONSTANTS
+// ============================================
+
+/**
+ * Cooldown period in seconds before a user can follow someone again after unfollowing
+ * Prevents follow/unfollow spam
+ */
+export const FOLLOW_COOLDOWN_SECONDS = 300; // 5 minutes
+
+// ============================================
 // PAGINATION CONSTANTS
 // ============================================
 
