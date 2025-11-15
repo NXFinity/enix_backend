@@ -1,0 +1,56 @@
+# GitHub Pages Jekyll Configuration
+
+title: Meta EN|IX Backend Documentation
+description: Comprehensive documentation for Meta EN|IX Backend API
+version: 1.3.0
+
+# Theme selection
+# Choose from: jekyll-theme-minimal, jekyll-theme-cayman, jekyll-theme-dinky, etc.
+# Or use remote_theme for custom themes
+theme: jekyll-theme-minimal
+
+# Or use a remote theme from GitHub:
+# remote_theme: pages-themes/minimal
+
+# Site settings
+baseurl: "/backend/docs"
+url: "https://your-username.github.io" # Replace with your GitHub Pages URL
+
+# Navigation
+navigation:
+  - title: Home
+    url: /backend/docs/
+  - title: API Reference
+    url: /backend/docs/api/
+  - title: Changelogs
+    url: /backend/docs/changelogs/
+  - title: Updates
+    url: /backend/docs/updates/
+
+# Plugins
+plugins:
+  - jekyll-feed
+  - jekyll-seo-tag
+
+# Exclude files from processing
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor
+  - .git
+  - .gitignore
+
+# Markdown settings
+markdown: kramdown
+kramdown:
+  input: GFM
+  hard_wrap: false
+
+# Build settings
+sass:
+  style: compressed
+
+# GitHub Pages settings
+github: [metadata]
+
