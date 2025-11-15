@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RedisService } from '@redis/redis';
-import { LoggingService, LogCategory, AuditLogService } from '@logging/logging';
+import { LoggingService, LogCategory, AuditLogService, LogLevel } from '@logging/logging';
 
 export interface SecurityEvent {
   type: 'failed_login' | 'suspicious_activity' | 'rate_limit_exceeded' | 'unauthorized_access' | '2fa_failed' | 'password_reset' | 'account_locked';
@@ -59,7 +59,7 @@ export class SecurityMonitorService {
       // Log to audit log
       await this.auditLogService.saveAuditLog({
         message: `Security event: ${event.type}`,
-        userId: event.userId || null,
+        userId: event.userId,
         category: LogCategory.SECURITY,
         level: this.getLogLevel(event.severity),
         metadata: {
@@ -70,9 +70,9 @@ export class SecurityMonitorService {
           details: event.details,
           severity: event.severity,
         },
-        ipAddress: event.ipAddress || null,
-        userAgent: event.userAgent || null,
-        endpoint: event.endpoint || null,
+        ipAddress: event.ipAddress,
+        userAgent: event.userAgent,
+        endpoint: event.endpoint,
       });
 
       // Check for alerts
@@ -150,13 +150,13 @@ export class SecurityMonitorService {
       // Log to audit log
       await this.auditLogService.saveAuditLog({
         message: `Security alert: ${alert.message}`,
-        userId: event.userId || null,
+        userId: event.userId,
         category: LogCategory.SECURITY,
         level: this.getLogLevel(event.severity),
         metadata: alert.metadata,
-        ipAddress: event.ipAddress || null,
-        userAgent: event.userAgent || null,
-        endpoint: event.endpoint || null,
+        ipAddress: event.ipAddress,
+        userAgent: event.userAgent,
+        endpoint: event.endpoint,
       });
     }
   }
@@ -322,17 +322,18 @@ export class SecurityMonitorService {
   /**
    * Get log level from severity
    */
-  private getLogLevel(severity: SecurityEvent['severity']): 'info' | 'warn' | 'error' {
+  private getLogLevel(severity: SecurityEvent['severity']): LogLevel {
     switch (severity) {
       case 'low':
-        return 'info';
+        return LogLevel.INFO;
       case 'medium':
-        return 'warn';
+        return LogLevel.WARN;
       case 'high':
+        return LogLevel.ERROR;
       case 'critical':
-        return 'error';
+        return LogLevel.CRITICAL;
       default:
-        return 'info';
+        return LogLevel.INFO;
     }
   }
 }
