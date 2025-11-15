@@ -1,7 +1,7 @@
 title: "Meta EN|IX API"
 description: "Official API documentation for Meta EN|IX."
 #theme: jekyll-theme-dinky
-remote_theme: pages-themes/tactile@v0.2.0
+remote_theme: pages-themes/slate@v0.2.0
 
 url: "https://nxfinity.github.io"
 baseurl: "/enix_backend"
