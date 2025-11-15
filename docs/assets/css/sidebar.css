@@ -1,26 +1,33 @@
-.sidebar-container {
-  float: left;
+.page {
+  display: flex;
+}
+
+.sidebar {
   width: 220px;
-  margin-right: 30px;
+  padding: 20px;
+  margin-right: 25px;
+  border-right: 1px solid #ccc;
 }
 
-.sidebar-nav ul {
-  list-style-type: none;
-  padding: 0;
+.nav {
+  list-style: none;
+  padding-left: 0;
 }
 
-.sidebar-nav a {
-  display: block;
-  padding: 6px 0;
-  font-weight: bold;
-  color: #569cd6; /* Slate blue */
+.nav li {
+  margin-bottom: 10px;
+}
+
+.nav a {
+  color: #569cd6;
   text-decoration: none;
+  font-weight: bold;
 }
 
-.sidebar-nav a:hover {
+.nav a:hover {
   text-decoration: underline;
 }
 
-.content-container {
-  overflow: hidden;
+.content {
+  flex: 1;
 }
