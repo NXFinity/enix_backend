@@ -1,0 +1,26 @@
+# GitHub Pages Jekyll Configuration
+
+title: Meta EN|IX API Documentation
+description: API documentation for Meta EN|IX platform
+version: 1.3.0
+
+# Theme selection
+theme: jekyll-theme-minimal
+
+# Site settings
+baseurl: ""
+url: ""
+
+# Markdown settings
+markdown: kramdown
+kramdown:
+  input: GFM
+  hard_wrap: false
+
+# Build settings
+sass:
+  style: compressed
+
+# GitHub Pages settings
+github: [metadata]
+
